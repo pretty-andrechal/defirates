@@ -40,19 +40,19 @@
                     <div class="filter-group">
                         <label for="min_apy">Min APY (%)</label>
                         <input type="number" name="min_apy" id="min_apy" step="0.1"
-                               placeholder="e.g., 5.0" value="{{if gt .Filters.MinAPY 0}}{{printf "%.2f" .Filters.MinAPY}}{{end}}">
+                               placeholder="e.g., 5.0" value="{{if ne .Filters.MinAPY 0.0}}{{printf "%.2f" .Filters.MinAPY}}{{end}}">
                     </div>
 
                     <div class="filter-group">
                         <label for="max_apy">Max APY (%)</label>
                         <input type="number" name="max_apy" id="max_apy" step="0.1"
-                               placeholder="e.g., 50.0" value="{{if gt .Filters.MaxAPY 0}}{{printf "%.2f" .Filters.MaxAPY}}{{end}}">
+                               placeholder="e.g., 50.0" value="{{if ne .Filters.MaxAPY 0.0}}{{printf "%.2f" .Filters.MaxAPY}}{{end}}">
                     </div>
 
                     <div class="filter-group">
                         <label for="min_tvl">Min TVL ($)</label>
                         <input type="number" name="min_tvl" id="min_tvl" step="1000"
-                               placeholder="e.g., 100000" value="{{if gt .Filters.MinTVL 0}}{{printf "%.0f" .Filters.MinTVL}}{{end}}">
+                               placeholder="e.g., 100000" value="{{if ne .Filters.MinTVL 0.0}}{{printf "%.0f" .Filters.MinTVL}}{{end}}">
                     </div>
 
                     <div class="filter-group">
