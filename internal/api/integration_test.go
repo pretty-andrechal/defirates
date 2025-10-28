@@ -344,3 +344,204 @@ func TestFetcher_CallbackChangeable(t *testing.T) {
 	// Note: May not be called if API is blocked, so we just check it's not the first
 	_ = callback2Called // Use the variable
 }
+
+// TestIntegration_FetchAndStoreBeefyData tests Beefy data fetching
+func TestIntegration_FetchAndStoreBeefyData(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Setup test database
+	dbPath := "test_beefy_integration_" + t.Name() + ".db"
+	db, err := database.New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer func() {
+		db.Close()
+		os.Remove(dbPath)
+	}()
+
+	// Create fetcher
+	fetcher := NewFetcher(db)
+
+	// Fetch Beefy data (this will hit real API or return gracefully if blocked)
+	err = fetcher.FetchAndStoreBeefyData()
+	if err != nil {
+		t.Logf("FetchAndStoreBeefyData() returned error (may be expected if API is blocked): %v", err)
+	}
+
+	// Verify protocol was created
+	protocol, err := db.GetProtocolByName("Beefy")
+	if err != nil {
+		t.Errorf("Protocol 'Beefy' should exist after fetch: %v", err)
+	}
+
+	if protocol.Name != "Beefy" {
+		t.Errorf("Protocol name = %s, want Beefy", protocol.Name)
+	}
+
+	// If API is accessible, we should have some rates
+	rates, err := db.GetYieldRates(models.FilterParams{ProtocolName: "Beefy"})
+	if err != nil {
+		t.Fatalf("GetYieldRates() failed: %v", err)
+	}
+
+	t.Logf("Fetched %d Beefy yield rates", len(rates))
+
+	// If we got rates, verify their structure
+	if len(rates) > 0 {
+		rate := rates[0]
+
+		// Verify required fields are populated
+		if rate.Asset == "" {
+			t.Error("Rate.Asset should not be empty")
+		}
+		if rate.Chain == "" {
+			t.Error("Rate.Chain should not be empty")
+		}
+		if rate.PoolName == "" {
+			t.Error("Rate.PoolName should not be empty")
+		}
+		// Beefy vaults don't have maturity dates
+		if rate.MaturityDate != nil {
+			t.Error("Beefy Rate.MaturityDate should be nil")
+		}
+
+		t.Logf("Sample Beefy rate: %s on %s - %.2f%% APY, $%.2f TVL",
+			rate.Asset, rate.Chain, rate.APY, rate.TVL)
+	}
+}
+
+// TestIntegration_ConvertBeefyVaultToYieldRate tests Beefy vault conversion logic
+func TestIntegration_ConvertBeefyVaultToYieldRate(t *testing.T) {
+	dbPath := "test_beefy_convert_" + t.Name() + ".db"
+	db, err := database.New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer func() {
+		db.Close()
+		os.Remove(dbPath)
+	}()
+
+	fetcher := NewFetcher(db)
+
+	vault := BeefyVaultWithMetrics{
+		Vault: BeefyVault{
+			ID:         "curve-eth-3pool",
+			Name:       "3Pool",
+			PlatformId: "curve",
+			Assets:     []string{"DAI", "USDC", "USDT"},
+		},
+		APY:   8.5, // Already in percentage
+		TVL:   45000000.50,
+		Chain: "Ethereum",
+	}
+
+	yieldRate := fetcher.convertBeefyVaultToYieldRate(vault, 1)
+
+	// Verify conversion
+	tests := []struct {
+		name string
+		got  interface{}
+		want interface{}
+	}{
+		{"Asset", yieldRate.Asset, "3Pool"},
+		{"Chain", yieldRate.Chain, "Ethereum"},
+		{"APY (already percentage)", yieldRate.APY, 8.5},
+		{"TVL", yieldRate.TVL, 45000000.50},
+		{"ProtocolID", yieldRate.ProtocolID, int64(1)},
+		{"MaturityDate", yieldRate.MaturityDate, (*time.Time)(nil)},
+		{"ExternalURL contains vault ID", contains(yieldRate.ExternalURL, "curve-eth-3pool"), true},
+		{"Categories contains Beefy", contains(yieldRate.Categories, "Beefy"), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s = %v, want %v", tt.name, tt.got, tt.want)
+			}
+		})
+	}
+}
+
+// TestIntegration_FetchAllData tests fetching from both protocols
+func TestIntegration_FetchAllData(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Setup test database
+	dbPath := "test_fetch_all_" + t.Name() + ".db"
+	db, err := database.New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer func() {
+		db.Close()
+		os.Remove(dbPath)
+	}()
+
+	// Create fetcher
+	fetcher := NewFetcher(db)
+
+	// Track callback
+	callbackCount := 0
+	var callbackMutex sync.Mutex
+	fetcher.SetOnDataUpdateCallback(func() {
+		callbackMutex.Lock()
+		callbackCount++
+		callbackMutex.Unlock()
+	})
+
+	// Fetch data from all sources
+	err = fetcher.FetchAllData()
+	if err != nil {
+		t.Logf("FetchAllData() returned error: %v", err)
+	}
+
+	// Verify both protocols were created
+	pendleProtocol, err := db.GetProtocolByName("Pendle")
+	if err != nil {
+		t.Errorf("Protocol 'Pendle' should exist: %v", err)
+	}
+
+	beefyProtocol, err := db.GetProtocolByName("Beefy")
+	if err != nil {
+		t.Errorf("Protocol 'Beefy' should exist: %v", err)
+	}
+
+	// Get all rates
+	allRates, err := db.GetYieldRates(models.FilterParams{})
+	if err != nil {
+		t.Fatalf("GetYieldRates() failed: %v", err)
+	}
+
+	t.Logf("Total rates fetched from all protocols: %d", len(allRates))
+
+	// Count by protocol
+	pendleCount := 0
+	beefyCount := 0
+	for _, rate := range allRates {
+		if rate.ProtocolID == pendleProtocol.ID {
+			pendleCount++
+		} else if rate.ProtocolID == beefyProtocol.ID {
+			beefyCount++
+		}
+	}
+
+	t.Logf("Pendle rates: %d, Beefy rates: %d", pendleCount, beefyCount)
+
+	// Callback should be called exactly once (from FetchAllData)
+	callbackMutex.Lock()
+	count := callbackCount
+	callbackMutex.Unlock()
+
+	if count > 1 {
+		t.Errorf("Callback should be called at most once, got %d calls", count)
+	}
+
+	t.Logf("Callback was invoked %d times", count)
+}
+
