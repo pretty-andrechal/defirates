@@ -1,4 +1,6 @@
 {{define "rows.html"}}
+<table>
+<tbody>
 {{range .YieldRates}}
 <tr id="rate-{{.ID}}" data-rate-id="{{.ID}}">
     <td><strong>{{.ProtocolName}}</strong></td>
@@ -44,4 +46,6 @@
     </td>
 </tr>
 {{end}}
+</tbody>
+</table>
 {{end}}
