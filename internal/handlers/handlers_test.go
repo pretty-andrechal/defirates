@@ -34,6 +34,24 @@ func setupTestHandler(t *testing.T) (*Handler, *database.DB, func()) {
 	return handler, db, cleanup
 }
 
+// setupTestDB creates a test database without handler
+func setupTestDB(t *testing.T) (*database.DB, func()) {
+	t.Helper()
+
+	dbPath := "test_handlers_" + t.Name() + ".db"
+	db, err := database.New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	cleanup := func() {
+		db.Close()
+		os.Remove(dbPath)
+	}
+
+	return db, cleanup
+}
+
 // TestHandleIndex_EmptyDatabase tests index page with no data
 func TestHandleIndex_EmptyDatabase(t *testing.T) {
 	handler, _, cleanup := setupTestHandler(t)
@@ -351,16 +369,244 @@ func TestHandleIndex_APYColorCoding(t *testing.T) {
 	}
 }
 
-// Helper function to check if string contains substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsRec(s, substr))
+// TestHandleAPIRates tests the HandleAPIRates endpoint
+func TestHandleAPIRates(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	h, err := New(db)
+	if err != nil {
+		t.Fatalf("Failed to create handler: %v", err)
+	}
+
+	// Create test data
+	protocol := &models.Protocol{Name: "TestProtocol"}
+	db.CreateOrUpdateProtocol(protocol)
+
+	rate1 := &models.YieldRate{
+		ProtocolID: protocol.ID,
+		Asset:      "ETH",
+		Chain:      "Ethereum",
+		APY:        10.5,
+		TVL:        1000000,
+		PoolName:   "PoolA-1",
+	}
+	rate2 := &models.YieldRate{
+		ProtocolID: protocol.ID,
+		Asset:      "USDC",
+		Chain:      "Arbitrum",
+		APY:        5.5,
+		TVL:        2000000,
+		PoolName:   "PoolB-1",
+	}
+
+	db.UpsertYieldRate(rate1)
+	db.UpsertYieldRate(rate2)
+
+	tests := []struct {
+		name           string
+		ids            string
+		wantStatus     int
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name:       "fetch single rate",
+			ids:        "1",
+			wantStatus: http.StatusOK,
+			wantContains: []string{
+				"rate-1",
+				"data-rate-id=\"1\"",
+				"ETH",
+				"10.50%",
+			},
+		},
+		{
+			name:       "fetch multiple rates",
+			ids:        "1,2",
+			wantStatus: http.StatusOK,
+			wantContains: []string{
+				"rate-1",
+				"rate-2",
+				"ETH",
+				"USDC",
+			},
+		},
+		{
+			name:       "missing ids parameter",
+			ids:        "",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid ids",
+			ids:        "abc,def",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "non-existent ids",
+			ids:        "999,998",
+			wantStatus: http.StatusOK,
+			wantContains: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var req *http.Request
+			if tt.ids != "" {
+				req = httptest.NewRequest(http.MethodGet, "/api/rates?ids="+tt.ids, nil)
+			} else {
+				req = httptest.NewRequest(http.MethodGet, "/api/rates", nil)
+			}
+			w := httptest.NewRecorder()
+
+			h.HandleAPIRates(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("HandleAPIRates() status = %d, want %d", w.Code, tt.wantStatus)
+			}
+
+			if tt.wantStatus == http.StatusOK {
+				body := w.Body.String()
+				for _, wantStr := range tt.wantContains {
+					if !contains(body, wantStr) {
+						t.Errorf("Response should contain: %s", wantStr)
+					}
+				}
+				for _, notWantStr := range tt.wantNotContain {
+					if contains(body, notWantStr) {
+						t.Errorf("Response should not contain: %s", notWantStr)
+					}
+				}
+
+				// Verify content type
+				contentType := w.Header().Get("Content-Type")
+				if contentType != "text/html" {
+					t.Errorf("Content-Type = %s, want text/html", contentType)
+				}
+			}
+		})
+	}
 }
 
-func containsRec(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
+// TestHandleAPIRates_RowFormat tests that rows are correctly formatted
+func TestHandleAPIRates_RowFormat(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	h, err := New(db)
+	if err != nil {
+		t.Fatalf("Failed to create handler: %v", err)
+	}
+
+	// Create test data
+	protocol := &models.Protocol{Name: "Pendle"}
+	db.CreateOrUpdateProtocol(protocol)
+
+	rate := &models.YieldRate{
+		ProtocolID: protocol.ID,
+		Asset:      "wstETH",
+		Chain:      "Ethereum",
+		APY:        12.45,
+		TVL:        5000000,
+		PoolName:   "wstETH-Pool",
+	}
+	db.UpsertYieldRate(rate)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/rates?ids=1", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleAPIRates(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("HandleAPIRates() status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	body := w.Body.String()
+
+	// Verify row structure
+	requiredElements := []string{
+		"<tr",
+		"id=\"rate-",
+		"data-rate-id=",
+		"<td>",
+		"</td>",
+		"</tr>",
+		"Pendle",
+		"wstETH",
+		"Ethereum",
+		"12.45%",
+	}
+
+	for _, elem := range requiredElements {
+		if !contains(body, elem) {
+			t.Errorf("Row should contain element: %s", elem)
 		}
 	}
-	return false
+}
+
+// TestGetEventManager tests the GetEventManager accessor
+func TestGetEventManager(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	h, err := New(db)
+	if err != nil {
+		t.Fatalf("Failed to create handler: %v", err)
+	}
+
+	em := h.GetEventManager()
+	if em == nil {
+		t.Error("GetEventManager() should return non-nil EventManager")
+	}
+
+	// Verify it's the same instance
+	em2 := h.GetEventManager()
+	if em != em2 {
+		t.Error("GetEventManager() should return the same instance")
+	}
+}
+
+// TestHandleEvents tests the SSE endpoint
+func TestHandleEvents(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	h, err := New(db)
+	if err != nil {
+		t.Fatalf("Failed to create handler: %v", err)
+	}
+
+	// Test SSE headers
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	w := httptest.NewRecorder()
+
+	// Run HandleEvents in a goroutine since it blocks
+	done := make(chan bool)
+	go func() {
+		h.HandleEvents(w, req)
+		done <- true
+	}()
+
+	// Give it time to set headers and send initial message
+	time.Sleep(200 * time.Millisecond)
+
+	// Cancel the request context to close the connection
+	// In real testing with httptest, we can't properly test streaming,
+	// so we just verify headers were set
+	result := w.Result()
+
+	// Verify SSE headers
+	if ct := result.Header.Get("Content-Type"); ct != "text/event-stream" {
+		t.Errorf("Content-Type = %s, want text/event-stream", ct)
+	}
+	if cc := result.Header.Get("Cache-Control"); cc != "no-cache" {
+		t.Errorf("Cache-Control = %s, want no-cache", cc)
+	}
+	if conn := result.Header.Get("Connection"); conn != "keep-alive" {
+		t.Errorf("Connection = %s, want keep-alive", conn)
+	}
+
+	// Note: We can't fully test SSE streaming with httptest.ResponseRecorder
+	// as it doesn't support flushing. This test just verifies headers.
 }

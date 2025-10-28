@@ -375,3 +375,214 @@ func TestGetDistinctChains(t *testing.T) {
 		t.Errorf("Expected 3 distinct chains, got %d: %v", len(distinctChains), distinctChains)
 	}
 }
+
+// TestGetYieldRatesByIDs tests fetching rates by specific IDs
+func TestGetYieldRatesByIDs(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create a protocol
+	protocol := &models.Protocol{Name: "TestProtocol"}
+	if err := db.CreateOrUpdateProtocol(protocol); err != nil {
+		t.Fatalf("Failed to create protocol: %v", err)
+	}
+
+	// Create multiple yield rates
+	var rateIDs []int64
+	for i := 0; i < 5; i++ {
+		rate := &models.YieldRate{
+			ProtocolID: protocol.ID,
+			Asset:      "ETH",
+			Chain:      "Ethereum",
+			APY:        float64(5 + i),
+			TVL:        float64(1000000 * (i + 1)),
+			PoolName:   "Pool" + string(rune(i+'A')) + "-1",
+		}
+		if err := db.UpsertYieldRate(rate); err != nil {
+			t.Fatalf("Failed to create rate: %v", err)
+		}
+		rateIDs = append(rateIDs, rate.ID)
+	}
+
+	tests := []struct {
+		name     string
+		ids      []int64
+		wantLen  int
+		wantErr  bool
+	}{
+		{
+			name:    "fetch single rate",
+			ids:     []int64{rateIDs[0]},
+			wantLen: 1,
+			wantErr: false,
+		},
+		{
+			name:    "fetch multiple rates",
+			ids:     []int64{rateIDs[0], rateIDs[2], rateIDs[4]},
+			wantLen: 3,
+			wantErr: false,
+		},
+		{
+			name:    "fetch all rates",
+			ids:     rateIDs,
+			wantLen: 5,
+			wantErr: false,
+		},
+		{
+			name:    "fetch non-existent rate",
+			ids:     []int64{99999},
+			wantLen: 0,
+			wantErr: false,
+		},
+		{
+			name:    "fetch mix of existing and non-existent",
+			ids:     []int64{rateIDs[0], 99999, rateIDs[1]},
+			wantLen: 2,
+			wantErr: false,
+		},
+		{
+			name:    "empty ID list",
+			ids:     []int64{},
+			wantLen: 0,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rates, err := db.GetYieldRatesByIDs(tt.ids)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetYieldRatesByIDs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if len(rates) != tt.wantLen {
+				t.Errorf("GetYieldRatesByIDs() returned %d rates, want %d", len(rates), tt.wantLen)
+			}
+
+			// Verify returned rates have correct IDs
+			if len(tt.ids) > 0 && len(rates) > 0 {
+				idMap := make(map[int64]bool)
+				for _, id := range tt.ids {
+					idMap[id] = true
+				}
+
+				for _, rate := range rates {
+					if !idMap[rate.ID] {
+						t.Errorf("Returned rate ID %d was not in requested IDs", rate.ID)
+					}
+					// Verify protocol name is populated (from JOIN)
+					if rate.ProtocolName == "" {
+						t.Error("ProtocolName should be populated from JOIN")
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestGetYieldRatesByIDs_Order tests that results maintain database order
+func TestGetYieldRatesByIDs_Order(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create protocol
+	protocol := &models.Protocol{Name: "TestProtocol"}
+	if err := db.CreateOrUpdateProtocol(protocol); err != nil {
+		t.Fatalf("Failed to create protocol: %v", err)
+	}
+
+	// Create rates with different APYs
+	rate1 := &models.YieldRate{
+		ProtocolID: protocol.ID,
+		Asset:      "ETH",
+		Chain:      "Ethereum",
+		APY:        10.0,
+		TVL:        1000000,
+		PoolName:   "PoolA-1",
+	}
+	rate2 := &models.YieldRate{
+		ProtocolID: protocol.ID,
+		Asset:      "ETH",
+		Chain:      "Ethereum",
+		APY:        15.0,
+		TVL:        2000000,
+		PoolName:   "PoolB-1",
+	}
+	rate3 := &models.YieldRate{
+		ProtocolID: protocol.ID,
+		Asset:      "ETH",
+		Chain:      "Ethereum",
+		APY:        5.0,
+		TVL:        3000000,
+		PoolName:   "PoolC-1",
+	}
+
+	db.UpsertYieldRate(rate1)
+	db.UpsertYieldRate(rate2)
+	db.UpsertYieldRate(rate3)
+
+	// Fetch in specific order
+	rates, err := db.GetYieldRatesByIDs([]int64{rate3.ID, rate1.ID, rate2.ID})
+	if err != nil {
+		t.Fatalf("GetYieldRatesByIDs() error = %v", err)
+	}
+
+	if len(rates) != 3 {
+		t.Fatalf("Expected 3 rates, got %d", len(rates))
+	}
+
+	// Verify we got all the rates (order may vary based on DB)
+	foundIDs := make(map[int64]bool)
+	for _, rate := range rates {
+		foundIDs[rate.ID] = true
+	}
+
+	if !foundIDs[rate1.ID] || !foundIDs[rate2.ID] || !foundIDs[rate3.ID] {
+		t.Error("Not all requested rates were returned")
+	}
+}
+
+// TestGetYieldRatesByIDs_WithMaturityDate tests fetching rates with maturity dates
+func TestGetYieldRatesByIDs_WithMaturityDate(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	protocol := &models.Protocol{Name: "TestProtocol"}
+	if err := db.CreateOrUpdateProtocol(protocol); err != nil {
+		t.Fatalf("Failed to create protocol: %v", err)
+	}
+
+	maturityDate := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)
+
+	rate := &models.YieldRate{
+		ProtocolID:   protocol.ID,
+		Asset:        "ETH",
+		Chain:        "Ethereum",
+		APY:          10.0,
+		TVL:          1000000,
+		MaturityDate: &maturityDate,
+		PoolName:     "MaturityPool-1",
+	}
+
+	if err := db.UpsertYieldRate(rate); err != nil {
+		t.Fatalf("Failed to create rate: %v", err)
+	}
+
+	rates, err := db.GetYieldRatesByIDs([]int64{rate.ID})
+	if err != nil {
+		t.Fatalf("GetYieldRatesByIDs() error = %v", err)
+	}
+
+	if len(rates) != 1 {
+		t.Fatalf("Expected 1 rate, got %d", len(rates))
+	}
+
+	if rates[0].MaturityDate == nil {
+		t.Fatal("MaturityDate should not be nil")
+	}
+
+	if !rates[0].MaturityDate.Equal(maturityDate) {
+		t.Errorf("MaturityDate = %v, want %v", rates[0].MaturityDate, maturityDate)
+	}
+}
