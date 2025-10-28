@@ -87,9 +87,29 @@
         <footer>
             <p>Data refreshed periodically from DeFi protocols. Currently showing: Pendle</p>
             <p>Built with Go and HTMX | <span id="connection-status" class="status-disconnected">Connecting to live updates...</span></p>
+            <details style="margin-top: 1rem;">
+                <summary style="cursor: pointer; font-weight: bold;">Debug Log (Click to expand)</summary>
+                <div id="debug-log" style="background: #f5f5f5; padding: 1rem; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.875rem; margin-top: 0.5rem;"></div>
+            </details>
         </footer>
     </div>
 
+    <script>
+        // Debug logging function
+        function debugLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = timestamp + ': ' + message;
+            console.log(logMessage);
+
+            const debugDiv = document.getElementById('debug-log');
+            if (debugDiv) {
+                const entry = document.createElement('div');
+                entry.textContent = logMessage;
+                debugDiv.appendChild(entry);
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+        }
+    </script>
     <script>
         // Real-time updates using Server-Sent Events
         (function() {
@@ -109,7 +129,7 @@
                 eventSource = new EventSource('/events');
 
                 eventSource.addEventListener('connected', function(e) {
-                    console.log('SSE: Connected to real-time updates');
+                    debugLog('SSE: Connected to real-time updates');
                     if (statusEl) {
                         statusEl.textContent = 'Live updates active';
                         statusEl.className = 'status-connected';
@@ -118,12 +138,12 @@
                 });
 
                 eventSource.addEventListener('update', function(e) {
-                    console.log('SSE: Data update received', e.data);
+                    debugLog('SSE: Data update received - ' + e.data);
                     updateVisibleRates();
                 });
 
                 eventSource.onerror = function(e) {
-                    console.error('SSE: Connection error', e);
+                    debugLog('SSE: Connection error or disconnected');
                     eventSource.close();
 
                     if (statusEl) {
@@ -139,39 +159,62 @@
 
             function getVisibleRateIds() {
                 const tbody = document.getElementById('rates-tbody');
-                if (!tbody) return [];
+                if (!tbody) {
+                    debugLog('WARNING: rates-tbody not found in DOM');
+                    return [];
+                }
 
                 const rows = tbody.querySelectorAll('tr[data-rate-id]');
+                debugLog('Found ' + rows.length + ' rows with data-rate-id');
+
                 const ids = [];
                 rows.forEach(row => {
                     const id = row.getAttribute('data-rate-id');
                     if (id) ids.push(id);
                 });
+                debugLog('Extracted IDs: ' + ids.join(', '));
                 return ids;
             }
 
             function updateVisibleRates() {
+                debugLog('updateVisibleRates() called');
+
                 const ids = getVisibleRateIds();
                 if (ids.length === 0) {
-                    console.log('No visible rates to update');
+                    debugLog('No visible rates to update');
                     return;
                 }
 
-                console.log('Updating', ids.length, 'visible rates');
+                debugLog('Updating ' + ids.length + ' visible rates');
 
                 // Fetch updated data for visible IDs
-                fetch('/api/rates?ids=' + ids.join(','))
-                    .then(response => response.text())
+                const url = '/api/rates?ids=' + ids.join(',');
+                debugLog('Fetching: ' + url);
+
+                fetch(url)
+                    .then(response => {
+                        debugLog('Fetch response status: ' + response.status);
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status);
+                        }
+                        return response.text();
+                    })
                     .then(html => {
+                        debugLog('Received HTML, length: ' + html.length);
+
                         // Parse the HTML to get individual rows
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
                         const newRows = doc.querySelectorAll('tr[data-rate-id]');
 
+                        debugLog('Parsed ' + newRows.length + ' new rows from response');
+
                         // Update each row in place (maintaining order)
+                        let updatedCount = 0;
                         newRows.forEach(newRow => {
                             const id = newRow.getAttribute('data-rate-id');
                             const existingRow = document.getElementById('rate-' + id);
+
                             if (existingRow) {
                                 // Replace the existing row's content with new content
                                 existingRow.innerHTML = newRow.innerHTML;
@@ -181,13 +224,15 @@
                                 setTimeout(() => {
                                     existingRow.classList.remove('row-updated');
                                 }, 1000);
+
+                                updatedCount++;
                             }
                         });
 
-                        console.log('Updated', newRows.length, 'rows in place');
+                        debugLog('Successfully updated ' + updatedCount + ' rows in place');
                     })
                     .catch(error => {
-                        console.error('Failed to fetch rate updates:', error);
+                        debugLog('ERROR: Failed to fetch rate updates - ' + error.message);
                     });
             }
 
