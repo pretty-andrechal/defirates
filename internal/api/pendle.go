@@ -117,7 +117,9 @@ func (c *PendleClient) GetMarketsForChain(chainID int) ([]Market, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	// Set headers - User-Agent is important for some APIs/WAFs
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "DeFiRates/1.0 (+https://github.com/pretty-andrechal/defirates)")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
