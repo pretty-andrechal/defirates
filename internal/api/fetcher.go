@@ -13,6 +13,7 @@ import (
 type Fetcher struct {
 	db              *database.DB
 	pendle          *PendleClient
+	beefy           *BeefyClient
 	onDataUpdate    func() // Callback function triggered when data is updated
 }
 
@@ -21,6 +22,7 @@ func NewFetcher(db *database.DB) *Fetcher {
 	return &Fetcher{
 		db:           db,
 		pendle:       NewPendleClient(),
+		beefy:        NewBeefyClient(),
 		onDataUpdate: nil,
 	}
 }
@@ -140,19 +142,125 @@ func (f *Fetcher) convertMarketToYieldRate(market Market, protocolID int64) mode
 	}
 }
 
+// FetchAndStoreBeefyData fetches data from Beefy and stores it in the database
+func (f *Fetcher) FetchAndStoreBeefyData() error {
+	log.Println("Fetching Beefy vaults...")
+
+	// Ensure Beefy protocol exists in database
+	protocol := &models.Protocol{
+		Name:        "Beefy",
+		URL:         "https://beefy.finance",
+		Description: "Beefy is a Decentralized, Multichain Yield Optimizer",
+	}
+
+	if err := f.db.CreateOrUpdateProtocol(protocol); err != nil {
+		return fmt.Errorf("failed to create/update protocol: %w", err)
+	}
+
+	// Fetch vaults with metrics
+	vaults, err := f.beefy.GetAllVaultsWithMetrics()
+	if err != nil {
+		log.Printf("Warning: failed to fetch Beefy vaults: %v", err)
+		log.Println("The Beefy API may be unavailable.")
+		return nil
+	}
+
+	log.Printf("Found %d active Beefy vaults", len(vaults))
+
+	// Store each vault as a yield rate
+	successCount := 0
+	for _, vault := range vaults {
+		yieldRate := f.convertBeefyVaultToYieldRate(vault, protocol.ID)
+
+		if err := f.db.UpsertYieldRate(&yieldRate); err != nil {
+			log.Printf("Failed to store yield rate for %s: %v", vault.Vault.Name, err)
+			continue
+		}
+		successCount++
+	}
+
+	log.Printf("Successfully stored %d Beefy yield rates", successCount)
+	return nil
+}
+
+// convertBeefyVaultToYieldRate converts a Beefy vault to our internal YieldRate model
+func (f *Fetcher) convertBeefyVaultToYieldRate(vault BeefyVaultWithMetrics, protocolID int64) models.YieldRate {
+	// Use vault name as asset
+	asset := vault.Vault.Name
+
+	// Get chain name
+	chain := vault.Chain
+
+	// APY is already in percentage
+	apy := vault.APY
+
+	// TVL from vault metrics
+	tvl := vault.TVL
+
+	// Generate pool name with platform info
+	poolName := fmt.Sprintf("%s-%s", vault.Vault.PlatformId, vault.Vault.ID)
+
+	// Generate external URL
+	externalURL := fmt.Sprintf("https://app.beefy.finance/vault/%s", vault.Vault.ID)
+
+	// Join assets as categories
+	categories := ""
+	if len(vault.Vault.Assets) > 0 {
+		categories = fmt.Sprintf("Beefy, %s", vault.Vault.Assets[0])
+		for i := 1; i < len(vault.Vault.Assets) && i < 3; i++ {
+			categories += ", " + vault.Vault.Assets[i]
+		}
+	} else {
+		categories = "Beefy"
+	}
+
+	return models.YieldRate{
+		ProtocolID:   protocolID,
+		Asset:        asset,
+		Chain:        chain,
+		APY:          apy,
+		TVL:          tvl,
+		MaturityDate: nil, // Beefy vaults don't have maturity dates
+		PoolName:     poolName,
+		Categories:   categories,
+		ExternalURL:  externalURL,
+	}
+}
+
+// FetchAllData fetches data from all supported protocols
+func (f *Fetcher) FetchAllData() error {
+	// Fetch Pendle data
+	if err := f.FetchAndStorePendleData(); err != nil {
+		log.Printf("Error fetching Pendle data: %v", err)
+	}
+
+	// Fetch Beefy data
+	if err := f.FetchAndStoreBeefyData(); err != nil {
+		log.Printf("Error fetching Beefy data: %v", err)
+	}
+
+	// Trigger data update callback if set
+	if f.onDataUpdate != nil {
+		log.Println("Broadcasting data update event...")
+		f.onDataUpdate()
+	}
+
+	return nil
+}
+
 // StartPeriodicFetch starts a background goroutine that fetches data periodically
 func (f *Fetcher) StartPeriodicFetch(interval time.Duration) {
 	// Fetch immediately on startup
-	if err := f.FetchAndStorePendleData(); err != nil {
-		log.Printf("Error fetching Pendle data on startup: %v", err)
+	if err := f.FetchAllData(); err != nil {
+		log.Printf("Error fetching data on startup: %v", err)
 	}
 
 	// Then fetch periodically
 	ticker := time.NewTicker(interval)
 	go func() {
 		for range ticker.C {
-			if err := f.FetchAndStorePendleData(); err != nil {
-				log.Printf("Error fetching Pendle data: %v", err)
+			if err := f.FetchAllData(); err != nil {
+				log.Printf("Error fetching data: %v", err)
 			}
 		}
 	}()
