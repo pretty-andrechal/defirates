@@ -72,21 +72,24 @@ type MarketsResponse struct {
 // ChainIDToName converts Pendle chain IDs to readable names
 var ChainIDToName = map[int]string{
 	1:     "Ethereum",
-	42161: "Arbitrum",
 	10:    "Optimism",
-	8453:  "Base",
 	56:    "BSC",
-	137:   "Polygon",
-	59144: "Linea",
-	534352: "Scroll",
+	146:   "Sonic",
+	999:   "Zora",
+	5000:  "Mantle",
+	8453:  "Base",
+	9745:  "Taiko",
+	42161: "Arbitrum",
+	80094: "Berachain",
 }
 
 // GetMarkets fetches all active markets from Pendle across all supported chains
 func (c *PendleClient) GetMarkets() ([]Market, error) {
 	var allMarkets []Market
 
-	// Fetch markets from each supported chain
-	chainIDs := []int{1, 42161, 10, 8453, 56, 137}
+	// Fetch markets from each supported chain (as of API response)
+	// Supported chains: 1, 10, 56, 146, 999, 5000, 8453, 9745, 42161, 80094
+	chainIDs := []int{1, 10, 56, 146, 999, 5000, 8453, 9745, 42161, 80094}
 
 	for _, chainID := range chainIDs {
 		markets, err := c.GetMarketsForChain(chainID)
