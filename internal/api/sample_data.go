@@ -33,6 +33,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          15_234_567.89,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-eETH-26DEC2025",
+			Categories:   "PT, LRT, Liquidity",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xf32e58f2f85714a65d2dcbb753e00ce58434f000/",
 		},
 		{
@@ -43,6 +44,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          8_945_123.45,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-ezETH-26DEC2025",
+			Categories:   "PT, LRT",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xd1d7d99764f8a52aff007b7831cc02748b2013b5/",
 		},
 		{
@@ -53,6 +55,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          12_678_901.23,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-rsETH-26DEC2025",
+			Categories:   "PT, LRT, Liquidity",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x4f43c77872db6ba177c270986cd30c3381af37ee/",
 		},
 		{
@@ -63,6 +66,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          45_123_456.78,
 			MaturityDate: timePtr(time.Date(2026, 1, 29, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-sUSDe-29JAN2026",
+			Categories:   "PT, Stablecoin",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x4a8e8befd2cf1480032a6f8a5c45d8c3ae1e8829/",
 		},
 		{
@@ -73,6 +77,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          23_456_789.01,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-LBTC-26DEC2025",
+			Categories:   "PT, BTC",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x8a47b431a7d947c6a3ed6e42d501803615a97eaa/",
 		},
 		{
@@ -83,6 +88,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          5_678_901.23,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-agETH-26DEC2025",
+			Categories:   "PT, LST",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x4a8e8befd2cf1480032a6f8a5c45d8c3ae1e8829/",
 		},
 		{
@@ -93,6 +99,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          7_890_123.45,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-rsETH-26DEC2025-ARB",
+			Categories:   "PT, LRT",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xed99fc8bdb8e9e7b8240f62f69609a125a0fbf14/",
 		},
 		{
@@ -103,6 +110,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          34_567_890.12,
 			MaturityDate: timePtr(time.Date(2026, 1, 29, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-USDe-29JAN2026",
+			Categories:   "PT, Stablecoin, Liquidity",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xbfef9183b47b3dd89a025f7dbfb44c58f4e0b68f/",
 		},
 		{
@@ -113,6 +121,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          9_876_543.21,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-wstETH-26DEC2025",
+			Categories:   "PT, LST, Liquidity",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x1c27ad8a19ba026adabd615f6bc77158130cfbe4/",
 		},
 		{
@@ -123,6 +132,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          28_901_234.56,
 			MaturityDate: timePtr(time.Date(2026, 1, 29, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-sUSDe-29JAN2026-ARB",
+			Categories:   "PT, Stablecoin",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xa0192f6567f8f5dc38c53323235fd08b318d2dca/",
 		},
 		{
@@ -133,6 +143,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          18_234_567.89,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-cbBTC-26DEC2025",
+			Categories:   "PT, BTC, Liquidity",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x94caeb3b9a1b7c61ef364f6c52260cf89b3bc667/",
 		},
 		{
@@ -143,6 +154,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          6_543_210.98,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-weETH-26DEC2025",
+			Categories:   "PT, LST",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x8e5ca4d5f8f3e5e5b2c2e5f5d5c5b5a5e5d5c5b5/",
 		},
 		{
@@ -153,6 +165,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          4_321_098.76,
 			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-mETH-26DEC2025",
+			Categories:   "PT, LST",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xa1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/",
 		},
 		{
@@ -163,6 +176,7 @@ func LoadSampleData(db *database.DB) error {
 			TVL:          12_345_678.90,
 			MaturityDate: timePtr(time.Date(2026, 1, 29, 0, 0, 0, 0, time.UTC)),
 			PoolName:     "PT-sUSDe-29JAN2026-MANTLE",
+			Categories:   "PT, Stablecoin, Liquidity",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0xb2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3/",
 		},
 	}

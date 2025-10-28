@@ -38,6 +38,16 @@
                     </div>
 
                     <div class="filter-group">
+                        <label for="categories">Categories</label>
+                        <select name="categories" id="categories">
+                            <option value="">All Categories</option>
+                            {{range .Categories}}
+                            <option value="{{.}}" {{if eq $.Filters.Categories .}}selected{{end}}>{{.}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
                         <label for="min_apy">Min APY (%)</label>
                         <input type="number" name="min_apy" id="min_apy" step="0.1"
                                placeholder="e.g., 5.0" value="{{if ne .Filters.MinAPY 0.0}}{{printf "%.2f" .Filters.MinAPY}}{{end}}">

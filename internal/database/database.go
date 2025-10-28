@@ -53,6 +53,7 @@ func (db *DB) migrate() error {
 		tvl REAL NOT NULL,
 		maturity_date DATETIME,
 		pool_name TEXT NOT NULL,
+		categories TEXT,
 		external_url TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -63,6 +64,7 @@ func (db *DB) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_yield_rates_apy ON yield_rates(apy);
 	CREATE INDEX IF NOT EXISTS idx_yield_rates_asset ON yield_rates(asset);
 	CREATE INDEX IF NOT EXISTS idx_yield_rates_chain ON yield_rates(chain);
+	CREATE INDEX IF NOT EXISTS idx_yield_rates_categories ON yield_rates(categories);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -126,8 +128,8 @@ func (db *DB) UpsertYieldRate(rate *models.YieldRate) error {
 	if err == sql.ErrNoRows {
 		// Insert new record
 		query := `
-			INSERT INTO yield_rates (protocol_id, asset, chain, apy, tvl, maturity_date, pool_name, external_url, updated_at, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO yield_rates (protocol_id, asset, chain, apy, tvl, maturity_date, pool_name, categories, external_url, updated_at, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
 		`
 		return db.conn.QueryRow(
@@ -139,6 +141,7 @@ func (db *DB) UpsertYieldRate(rate *models.YieldRate) error {
 			rate.TVL,
 			rate.MaturityDate,
 			rate.PoolName,
+			rate.Categories,
 			rate.ExternalURL,
 			now,
 			now,
@@ -150,7 +153,7 @@ func (db *DB) UpsertYieldRate(rate *models.YieldRate) error {
 	// Update existing record
 	query := `
 		UPDATE yield_rates
-		SET asset = ?, apy = ?, tvl = ?, maturity_date = ?, external_url = ?, updated_at = ?
+		SET asset = ?, apy = ?, tvl = ?, maturity_date = ?, categories = ?, external_url = ?, updated_at = ?
 		WHERE id = ?
 	`
 	_, err = db.conn.Exec(
@@ -159,6 +162,7 @@ func (db *DB) UpsertYieldRate(rate *models.YieldRate) error {
 		rate.APY,
 		rate.TVL,
 		rate.MaturityDate,
+		rate.Categories,
 		rate.ExternalURL,
 		now,
 		existingID,
@@ -172,7 +176,7 @@ func (db *DB) GetYieldRates(filters models.FilterParams) ([]models.YieldRate, er
 	query := `
 		SELECT
 			yr.id, yr.protocol_id, p.name as protocol_name, yr.asset, yr.chain,
-			yr.apy, yr.tvl, yr.maturity_date, yr.pool_name, yr.external_url,
+			yr.apy, yr.tvl, yr.maturity_date, yr.pool_name, yr.categories, yr.external_url,
 			yr.updated_at, yr.created_at
 		FROM yield_rates yr
 		JOIN protocols p ON yr.protocol_id = p.id
@@ -211,6 +215,11 @@ func (db *DB) GetYieldRates(filters models.FilterParams) ([]models.YieldRate, er
 		args = append(args, filters.ProtocolName)
 	}
 
+	if filters.Categories != "" {
+		query += " AND yr.categories LIKE ?"
+		args = append(args, "%"+filters.Categories+"%")
+	}
+
 	// Sorting
 	sortBy := "yr.apy"
 	if filters.SortBy != "" {
@@ -241,6 +250,7 @@ func (db *DB) GetYieldRates(filters models.FilterParams) ([]models.YieldRate, er
 	for rows.Next() {
 		var rate models.YieldRate
 		var maturityDate sql.NullTime
+		var categories sql.NullString
 
 		err := rows.Scan(
 			&rate.ID,
@@ -252,6 +262,7 @@ func (db *DB) GetYieldRates(filters models.FilterParams) ([]models.YieldRate, er
 			&rate.TVL,
 			&maturityDate,
 			&rate.PoolName,
+			&categories,
 			&rate.ExternalURL,
 			&rate.UpdatedAt,
 			&rate.CreatedAt,
@@ -262,6 +273,10 @@ func (db *DB) GetYieldRates(filters models.FilterParams) ([]models.YieldRate, er
 
 		if maturityDate.Valid {
 			rate.MaturityDate = &maturityDate.Time
+		}
+
+		if categories.Valid {
+			rate.Categories = categories.String
 		}
 
 		rates = append(rates, rate)
@@ -312,6 +327,53 @@ func (db *DB) GetDistinctChains() ([]string, error) {
 	return chains, rows.Err()
 }
 
+// GetDistinctCategories returns all unique categories (flattened from comma-separated values)
+func (db *DB) GetDistinctCategories() ([]string, error) {
+	query := `SELECT DISTINCT categories FROM yield_rates WHERE categories IS NOT NULL AND categories != '' ORDER BY categories`
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	categoriesSet := make(map[string]bool)
+	for rows.Next() {
+		var categoriesStr string
+		if err := rows.Scan(&categoriesStr); err != nil {
+			return nil, err
+		}
+		// Split comma-separated categories and add to set
+		for _, cat := range strings.Split(categoriesStr, ",") {
+			trimmed := strings.TrimSpace(cat)
+			if trimmed != "" {
+				categoriesSet[trimmed] = true
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Convert set to sorted slice
+	categories := make([]string, 0, len(categoriesSet))
+	for cat := range categoriesSet {
+		categories = append(categories, cat)
+	}
+
+	// Sort alphabetically
+	sortedCategories := categories
+	for i := 0; i < len(sortedCategories)-1; i++ {
+		for j := i + 1; j < len(sortedCategories); j++ {
+			if sortedCategories[i] > sortedCategories[j] {
+				sortedCategories[i], sortedCategories[j] = sortedCategories[j], sortedCategories[i]
+			}
+		}
+	}
+
+	return sortedCategories, nil
+}
+
 // GetYieldRatesByIDs retrieves yield rates by their IDs
 func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
 	if len(ids) == 0 {
@@ -329,7 +391,7 @@ func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			yr.id, yr.protocol_id, p.name as protocol_name, yr.asset, yr.chain,
-			yr.apy, yr.tvl, yr.maturity_date, yr.pool_name, yr.external_url,
+			yr.apy, yr.tvl, yr.maturity_date, yr.pool_name, yr.categories, yr.external_url,
 			yr.updated_at, yr.created_at
 		FROM yield_rates yr
 		JOIN protocols p ON yr.protocol_id = p.id
@@ -346,6 +408,7 @@ func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
 	for rows.Next() {
 		var rate models.YieldRate
 		var maturityDate sql.NullTime
+		var categories sql.NullString
 
 		err := rows.Scan(
 			&rate.ID,
@@ -357,6 +420,7 @@ func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
 			&rate.TVL,
 			&maturityDate,
 			&rate.PoolName,
+			&categories,
 			&rate.ExternalURL,
 			&rate.UpdatedAt,
 			&rate.CreatedAt,
@@ -367,6 +431,10 @@ func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
 
 		if maturityDate.Valid {
 			rate.MaturityDate = &maturityDate.Time
+		}
+
+		if categories.Valid {
+			rate.Categories = categories.String
 		}
 
 		rates = append(rates, rate)

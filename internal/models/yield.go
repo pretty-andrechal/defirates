@@ -22,6 +22,7 @@ type YieldRate struct {
 	TVL          float64   `json:"tvl"`          // Total Value Locked
 	MaturityDate *time.Time `json:"maturity_date,omitempty"` // For fixed-term yields like Pendle
 	PoolName     string    `json:"pool_name"`    // Specific pool identifier
+	Categories   string    `json:"categories"`   // Comma-separated categories (e.g., "PT", "Liquidity")
 	ExternalURL  string    `json:"external_url"` // Link to the actual pool
 	UpdatedAt    time.Time `json:"updated_at"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -35,6 +36,7 @@ type FilterParams struct {
 	Asset        string
 	Chain        string
 	ProtocolName string
+	Categories   string
 	SortBy       string // "apy", "tvl", "updated_at"
 	SortOrder    string // "asc", "desc"
 }

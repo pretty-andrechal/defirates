@@ -51,11 +51,12 @@ func New(db *database.DB) (*Handler, error) {
 // parseFilterParams extracts filter parameters from the request
 func (h *Handler) parseFilterParams(r *http.Request) models.FilterParams {
 	filters := models.FilterParams{
-		SortBy:    r.URL.Query().Get("sort_by"),
-		SortOrder: r.URL.Query().Get("sort_order"),
-		Asset:     r.URL.Query().Get("asset"),
-		Chain:     r.URL.Query().Get("chain"),
+		SortBy:       r.URL.Query().Get("sort_by"),
+		SortOrder:    r.URL.Query().Get("sort_order"),
+		Asset:        r.URL.Query().Get("asset"),
+		Chain:        r.URL.Query().Get("chain"),
 		ProtocolName: r.URL.Query().Get("protocol"),
+		Categories:   r.URL.Query().Get("categories"),
 	}
 
 	if minAPY := r.URL.Query().Get("min_apy"); minAPY != "" {
@@ -110,15 +111,23 @@ func (h *Handler) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		chains = []string{}
 	}
 
+	categories, err := h.db.GetDistinctCategories()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		categories = []string{}
+	}
+
 	data := struct {
 		YieldRates []models.YieldRate
 		Assets     []string
 		Chains     []string
+		Categories []string
 		Filters    models.FilterParams
 	}{
 		YieldRates: rates,
 		Assets:     assets,
 		Chains:     chains,
+		Categories: categories,
 		Filters:    filters,
 	}
 

@@ -11,6 +11,13 @@
         <span class="chain-badge">{{.Chain}}</span>
     </td>
     <td>
+        {{if .Categories}}
+        <span class="categories-text">{{.Categories}}</span>
+        {{else}}
+        <span class="categories-text" style="color: #999;">N/A</span>
+        {{end}}
+    </td>
+    <td>
         <span class="apy-value {{if ge .APY 10.0}}apy-high{{else if ge .APY 5.0}}apy-medium{{else}}apy-low{{end}}">
             {{printf "%.2f" .APY}}%
         </span>

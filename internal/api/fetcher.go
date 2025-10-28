@@ -118,6 +118,15 @@ func (f *Fetcher) convertMarketToYieldRate(market Market, protocolID int64) mode
 	poolName := fmt.Sprintf("%s-%d", market.Name, market.ChainID)
 	externalURL := fmt.Sprintf("https://app.pendle.finance/trade/pools/%s/", market.Address)
 
+	// Join category IDs into comma-separated string
+	var categories string
+	if len(market.CategoryIDs) > 0 {
+		categories = fmt.Sprintf("%s", market.CategoryIDs[0])
+		for i := 1; i < len(market.CategoryIDs); i++ {
+			categories += ", " + market.CategoryIDs[i]
+		}
+	}
+
 	return models.YieldRate{
 		ProtocolID:   protocolID,
 		Asset:        asset,
@@ -126,6 +135,7 @@ func (f *Fetcher) convertMarketToYieldRate(market Market, protocolID int64) mode
 		TVL:          tvl,
 		MaturityDate: maturityDate,
 		PoolName:     poolName,
+		Categories:   categories,
 		ExternalURL:  externalURL,
 	}
 }
