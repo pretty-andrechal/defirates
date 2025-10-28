@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	PendleBaseURL = "https://api-v2.pendle.finance/core"
+	PendleBaseURL = "https://api-v2.pendle.finance/api/core"
 )
 
 // PendleClient handles communication with Pendle API
