@@ -62,7 +62,11 @@ run_test_suite "Integration Tests" "go test -v ./internal/api -run Integration"
 # 5. Run all tests with race detector
 echo "Running all tests with race detector..."
 echo "----------------------------------------"
-if go test -race ./...; then
+# Suppress macOS linker warnings about LC_DYSYMTAB (known harmless issue)
+OUTPUT=$(go test -race ./... 2>&1)
+RESULT=$?
+echo "$OUTPUT" | grep -v "ld: warning.*LC_DYSYMTAB"
+if [ $RESULT -eq 0 ]; then
     echo -e "${GREEN}✓ No race conditions detected${NC}"
 else
     echo -e "${YELLOW}⚠ Race conditions detected (review above)${NC}"
