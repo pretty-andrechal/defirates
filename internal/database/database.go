@@ -311,3 +311,66 @@ func (db *DB) GetDistinctChains() ([]string, error) {
 
 	return chains, rows.Err()
 }
+
+// GetYieldRatesByIDs retrieves yield rates by their IDs
+func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
+	if len(ids) == 0 {
+		return []models.YieldRate{}, nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			yr.id, yr.protocol_id, p.name as protocol_name, yr.asset, yr.chain,
+			yr.apy, yr.tvl, yr.maturity_date, yr.pool_name, yr.external_url,
+			yr.updated_at, yr.created_at
+		FROM yield_rates yr
+		JOIN protocols p ON yr.protocol_id = p.id
+		WHERE yr.id IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rates []models.YieldRate
+	for rows.Next() {
+		var rate models.YieldRate
+		var maturityDate sql.NullTime
+
+		err := rows.Scan(
+			&rate.ID,
+			&rate.ProtocolID,
+			&rate.ProtocolName,
+			&rate.Asset,
+			&rate.Chain,
+			&rate.APY,
+			&rate.TVL,
+			&maturityDate,
+			&rate.PoolName,
+			&rate.ExternalURL,
+			&rate.UpdatedAt,
+			&rate.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if maturityDate.Valid {
+			rate.MaturityDate = &maturityDate.Time
+		}
+
+		rates = append(rates, rate)
+	}
+
+	return rates, rows.Err()
+}

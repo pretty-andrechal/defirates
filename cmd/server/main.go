@@ -36,20 +36,25 @@ func main() {
 		}
 	}
 
-	// Initialize data fetcher and start periodic updates
-	fetcher := api.NewFetcher(db)
-	fetcher.StartPeriodicFetch(*fetchInterval)
-	log.Printf("Data fetcher started (interval: %v)", *fetchInterval)
-
 	// Initialize HTTP handlers
 	handler, err := handlers.New(db)
 	if err != nil {
 		log.Fatalf("Failed to initialize handlers: %v", err)
 	}
 
+	// Initialize data fetcher and wire up SSE callback
+	fetcher := api.NewFetcher(db)
+	fetcher.SetOnDataUpdateCallback(func() {
+		handler.GetEventManager().BroadcastDataUpdate()
+	})
+	fetcher.StartPeriodicFetch(*fetchInterval)
+	log.Printf("Data fetcher started (interval: %v)", *fetchInterval)
+
 	// Setup routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handler.HandleIndex)
+	mux.HandleFunc("/events", handler.HandleEvents)
+	mux.HandleFunc("/api/rates", handler.HandleAPIRates)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Start server
@@ -61,8 +66,8 @@ func main() {
 		Addr:         addr,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		WriteTimeout: 0, // No timeout for SSE connections
+		IdleTimeout:  120 * time.Second,
 	}
 
 	if err := server.ListenAndServe(); err != nil {

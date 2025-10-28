@@ -286,3 +286,40 @@ footer p {
         padding: 0.5rem;
     }
 }
+
+/* Real-time Updates */
+#connection-status {
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.status-connected {
+    color: var(--success);
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.status-connecting {
+    color: var(--warning);
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.status-disconnected {
+    color: var(--danger);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Row update animation */
+@keyframes rowUpdate {
+    0% {
+        background-color: rgba(79, 70, 229, 0.2);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.row-updated {
+    animation: rowUpdate 1s ease-out;
+}

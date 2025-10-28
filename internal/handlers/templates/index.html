@@ -86,8 +86,121 @@
 
         <footer>
             <p>Data refreshed periodically from DeFi protocols. Currently showing: Pendle</p>
-            <p>Built with Go and HTMX</p>
+            <p>Built with Go and HTMX | <span id="connection-status" class="status-disconnected">Connecting to live updates...</span></p>
         </footer>
     </div>
+
+    <script>
+        // Real-time updates using Server-Sent Events
+        (function() {
+            let eventSource = null;
+            let reconnectDelay = 1000;
+            const maxReconnectDelay = 30000;
+
+            function connectSSE() {
+                // Update status
+                const statusEl = document.getElementById('connection-status');
+                if (statusEl) {
+                    statusEl.textContent = 'Connecting to live updates...';
+                    statusEl.className = 'status-connecting';
+                }
+
+                // Connect to SSE endpoint
+                eventSource = new EventSource('/events');
+
+                eventSource.addEventListener('connected', function(e) {
+                    console.log('SSE: Connected to real-time updates');
+                    if (statusEl) {
+                        statusEl.textContent = 'Live updates active';
+                        statusEl.className = 'status-connected';
+                    }
+                    reconnectDelay = 1000; // Reset reconnect delay on successful connection
+                });
+
+                eventSource.addEventListener('update', function(e) {
+                    console.log('SSE: Data update received', e.data);
+                    updateVisibleRates();
+                });
+
+                eventSource.onerror = function(e) {
+                    console.error('SSE: Connection error', e);
+                    eventSource.close();
+
+                    if (statusEl) {
+                        statusEl.textContent = 'Reconnecting...';
+                        statusEl.className = 'status-disconnected';
+                    }
+
+                    // Reconnect with exponential backoff
+                    setTimeout(connectSSE, reconnectDelay);
+                    reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+                };
+            }
+
+            function getVisibleRateIds() {
+                const tbody = document.getElementById('rates-tbody');
+                if (!tbody) return [];
+
+                const rows = tbody.querySelectorAll('tr[data-rate-id]');
+                const ids = [];
+                rows.forEach(row => {
+                    const id = row.getAttribute('data-rate-id');
+                    if (id) ids.push(id);
+                });
+                return ids;
+            }
+
+            function updateVisibleRates() {
+                const ids = getVisibleRateIds();
+                if (ids.length === 0) {
+                    console.log('No visible rates to update');
+                    return;
+                }
+
+                console.log('Updating', ids.length, 'visible rates');
+
+                // Fetch updated data for visible IDs
+                fetch('/api/rates?ids=' + ids.join(','))
+                    .then(response => response.text())
+                    .then(html => {
+                        // Parse the HTML to get individual rows
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const newRows = doc.querySelectorAll('tr[data-rate-id]');
+
+                        // Update each row in place (maintaining order)
+                        newRows.forEach(newRow => {
+                            const id = newRow.getAttribute('data-rate-id');
+                            const existingRow = document.getElementById('rate-' + id);
+                            if (existingRow) {
+                                // Replace the existing row's content with new content
+                                existingRow.innerHTML = newRow.innerHTML;
+
+                                // Add a brief highlight animation
+                                existingRow.classList.add('row-updated');
+                                setTimeout(() => {
+                                    existingRow.classList.remove('row-updated');
+                                }, 1000);
+                            }
+                        });
+
+                        console.log('Updated', newRows.length, 'rows in place');
+                    })
+                    .catch(error => {
+                        console.error('Failed to fetch rate updates:', error);
+                    });
+            }
+
+            // Initialize SSE connection
+            connectSSE();
+
+            // Clean up on page unload
+            window.addEventListener('beforeunload', function() {
+                if (eventSource) {
+                    eventSource.close();
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

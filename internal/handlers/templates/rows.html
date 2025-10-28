@@ -1,0 +1,47 @@
+{{define "rows.html"}}
+{{range .YieldRates}}
+<tr id="rate-{{.ID}}" data-rate-id="{{.ID}}">
+    <td><strong>{{.ProtocolName}}</strong></td>
+    <td>
+        <span class="asset-badge">{{.Asset}}</span>
+    </td>
+    <td>
+        <span class="chain-badge">{{.Chain}}</span>
+    </td>
+    <td>
+        <span class="apy-value {{if ge .APY 10.0}}apy-high{{else if ge .APY 5.0}}apy-medium{{else}}apy-low{{end}}">
+            {{printf "%.2f" .APY}}%
+        </span>
+    </td>
+    <td>
+        {{if ge .TVL 1000000.0}}
+            ${{printf "%.2fM" (divf .TVL 1000000.0)}}
+        {{else if ge .TVL 1000.0}}
+            ${{printf "%.2fK" (divf .TVL 1000.0)}}
+        {{else}}
+            ${{printf "%.2f" .TVL}}
+        {{end}}
+    </td>
+    <td>
+        {{if .MaturityDate}}
+            {{.MaturityDate.Format "Jan 02, 2006"}}
+        {{else}}
+            N/A
+        {{end}}
+    </td>
+    <td>
+        <span class="pool-name">{{.PoolName}}</span>
+    </td>
+    <td>
+        <span class="updated-time">{{.UpdatedAt.Format "Jan 02, 15:04"}}</span>
+    </td>
+    <td>
+        {{if .ExternalURL}}
+        <a href="{{.ExternalURL}}" target="_blank" rel="noopener noreferrer" class="btn btn-small">
+            View
+        </a>
+        {{end}}
+    </td>
+</tr>
+{{end}}
+{{end}}

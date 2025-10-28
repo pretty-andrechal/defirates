@@ -11,16 +11,23 @@ import (
 
 // Fetcher handles fetching and storing yield data
 type Fetcher struct {
-	db     *database.DB
-	pendle *PendleClient
+	db              *database.DB
+	pendle          *PendleClient
+	onDataUpdate    func() // Callback function triggered when data is updated
 }
 
 // NewFetcher creates a new data fetcher
 func NewFetcher(db *database.DB) *Fetcher {
 	return &Fetcher{
-		db:     db,
-		pendle: NewPendleClient(),
+		db:           db,
+		pendle:       NewPendleClient(),
+		onDataUpdate: nil,
 	}
+}
+
+// SetOnDataUpdateCallback sets a callback function to be called when data is updated
+func (f *Fetcher) SetOnDataUpdateCallback(callback func()) {
+	f.onDataUpdate = callback
 }
 
 // FetchAndStorePendleData fetches data from Pendle and stores it in the database
@@ -63,6 +70,13 @@ func (f *Fetcher) FetchAndStorePendleData() error {
 	}
 
 	log.Printf("Successfully stored %d yield rates", successCount)
+
+	// Trigger data update callback if set
+	if f.onDataUpdate != nil {
+		log.Println("Broadcasting data update event...")
+		f.onDataUpdate()
+	}
+
 	return nil
 }
 

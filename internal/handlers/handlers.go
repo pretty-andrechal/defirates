@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -17,8 +18,9 @@ var templatesFS embed.FS
 
 // Handler manages HTTP requests
 type Handler struct {
-	db        *database.DB
-	templates *template.Template
+	db           *database.DB
+	templates    *template.Template
+	eventManager *EventManager
 }
 
 // New creates a new handler
@@ -40,8 +42,9 @@ func New(db *database.DB) (*Handler, error) {
 	}
 
 	return &Handler{
-		db:        db,
-		templates: tmpl,
+		db:           db,
+		templates:    tmpl,
+		eventManager: NewEventManager(),
 	}, nil
 }
 
@@ -141,4 +144,94 @@ func (h *Handler) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	// Remove /static/ prefix
 	path := strings.TrimPrefix(r.URL.Path, "/static/")
 	http.ServeFile(w, r, "static/"+path)
+}
+
+// HandleEvents serves Server-Sent Events for real-time updates
+func (h *Handler) HandleEvents(w http.ResponseWriter, r *http.Request) {
+	// Set headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Create a channel for this client
+	clientChan := make(chan string, 10)
+
+	// Register the client
+	h.eventManager.Register(clientChan)
+	defer h.eventManager.Unregister(clientChan)
+
+	// Send initial connection message
+	fmt.Fprintf(w, "event: connected\ndata: {\"message\": \"Connected to real-time updates\"}\n\n")
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+
+	// Listen for messages and client disconnect
+	for {
+		select {
+		case msg := <-clientChan:
+			// Send message to client
+			fmt.Fprint(w, msg)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		case <-r.Context().Done():
+			// Client disconnected
+			return
+		}
+	}
+}
+
+// HandleAPIRates returns rates for specific IDs (for real-time updates)
+func (h *Handler) HandleAPIRates(w http.ResponseWriter, r *http.Request) {
+	// Get IDs from query parameter
+	idsParam := r.URL.Query().Get("ids")
+	if idsParam == "" {
+		http.Error(w, "Missing 'ids' parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Parse comma-separated IDs
+	idStrs := strings.Split(idsParam, ",")
+	var ids []int64
+	for _, idStr := range idStrs {
+		id, err := strconv.ParseInt(strings.TrimSpace(idStr), 10, 64)
+		if err != nil {
+			continue // Skip invalid IDs
+		}
+		ids = append(ids, id)
+	}
+
+	if len(ids) == 0 {
+		http.Error(w, "No valid IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch rates by IDs
+	rates, err := h.db.GetYieldRatesByIDs(ids)
+	if err != nil {
+		log.Printf("Error fetching rates by IDs: %v", err)
+		http.Error(w, "Failed to fetch rates", http.StatusInternalServerError)
+		return
+	}
+
+	// Return as JSON for HTMX to consume
+	// We'll render the table rows HTML
+	data := struct {
+		YieldRates []models.YieldRate
+	}{
+		YieldRates: rates,
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := h.templates.ExecuteTemplate(w, "rows.html", data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+	}
+}
+
+// GetEventManager returns the event manager (for use by fetcher)
+func (h *Handler) GetEventManager() *EventManager {
+	return h.eventManager
 }
