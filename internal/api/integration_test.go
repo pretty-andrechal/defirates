@@ -9,8 +9,8 @@ import (
 	"github.com/pretty-andrechal/defirates/internal/models"
 )
 
-// TestFetcher_FetchAndStorePendleData tests the complete flow
-func TestFetcher_FetchAndStorePendleData(t *testing.T) {
+// TestIntegration_FetchAndStorePendleData tests the complete flow
+func TestIntegration_FetchAndStorePendleData(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -76,8 +76,8 @@ func TestFetcher_FetchAndStorePendleData(t *testing.T) {
 	}
 }
 
-// TestConvertMarketToYieldRate tests market conversion logic
-func TestConvertMarketToYieldRate(t *testing.T) {
+// TestIntegration_ConvertMarketToYieldRate tests market conversion logic
+func TestIntegration_ConvertMarketToYieldRate(t *testing.T) {
 	dbPath := "test_convert_" + t.Name() + ".db"
 	db, err := database.New(dbPath)
 	if err != nil {
@@ -136,8 +136,8 @@ func TestConvertMarketToYieldRate(t *testing.T) {
 	}
 }
 
-// TestFetcher_MultipleChains tests fetching from multiple chains
-func TestFetcher_MultipleChains(t *testing.T) {
+// TestIntegration_MultipleChains tests fetching from multiple chains
+func TestIntegration_MultipleChains(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
