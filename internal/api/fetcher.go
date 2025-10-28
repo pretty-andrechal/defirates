@@ -56,7 +56,7 @@ func (f *Fetcher) FetchAndStorePendleData() error {
 		yieldRate := f.convertMarketToYieldRate(market, protocol.ID)
 
 		if err := f.db.UpsertYieldRate(&yieldRate); err != nil {
-			log.Printf("Failed to store yield rate for %s: %v", market.Symbol, err)
+			log.Printf("Failed to store yield rate for %s: %v", market.Name, err)
 			continue
 		}
 		successCount++
@@ -76,26 +76,20 @@ func (f *Fetcher) convertMarketToYieldRate(market Market, protocolID int64) mode
 		maturityDate = &expiry
 	}
 
-	// Determine the asset (use the underlying token symbol if available)
-	asset := market.Symbol
-	if len(market.Underlyings) > 0 {
-		asset = market.Underlyings[0].Symbol
-	} else if market.PT.Symbol != "" {
-		// Extract base asset from PT symbol (e.g., "PT-eETH" -> "eETH")
-		asset = market.PT.Symbol
-	}
+	// Use market name as asset (e.g., "wstETH", "sUSDe")
+	asset := market.Name
 
 	// Get chain name
 	chain := GetChainName(market.ChainID)
 
 	// Convert implied APY from decimal to percentage
-	apy := market.ImpliedAPY * 100
+	apy := market.Details.ImpliedAPY * 100
 
 	// TVL is the liquidity in USD
-	tvl := market.Liquidity.USD
+	tvl := market.Details.Liquidity
 
 	// Generate pool name and external URL
-	poolName := fmt.Sprintf("%s-%d", market.Symbol, market.ChainID)
+	poolName := fmt.Sprintf("%s-%d", market.Name, market.ChainID)
 	externalURL := fmt.Sprintf("https://app.pendle.finance/trade/pools/%s/", market.Address)
 
 	return models.YieldRate{

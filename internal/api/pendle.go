@@ -28,45 +28,33 @@ func NewPendleClient() *PendleClient {
 	}
 }
 
-// Market represents a Pendle market
+// Market represents a Pendle market (matching actual API response)
 type Market struct {
-	Address      string       `json:"address"`
-	ChainID      int          `json:"chainId"`
-	Symbol       string       `json:"symbol"`
-	Name         string       `json:"name"`
-	Expiry       string       `json:"expiry"`
-	PT           TokenInfo    `json:"pt"`
-	SY           TokenInfo    `json:"sy"`
-	YT           TokenInfo    `json:"yt"`
-	Underlyings  []TokenInfo  `json:"underlyings"`
-	ImpliedAPY   float64      `json:"impliedApy"`
-	Liquidity    Liquidity    `json:"liquidity"`
-	TotalPT      string       `json:"totalPt"`
-	TotalSY      string       `json:"totalSy"`
-	Aggregated   *Aggregated  `json:"aggregated,omitempty"`
+	Name            string         `json:"name"`
+	Address         string         `json:"address"`
+	Expiry          string         `json:"expiry"`
+	PT              string         `json:"pt"`
+	YT              string         `json:"yt"`
+	SY              string         `json:"sy"`
+	UnderlyingAsset string         `json:"underlyingAsset"`
+	Details         MarketDetails  `json:"details"`
+	Timestamp       string         `json:"timestamp"`
+	CategoryIDs     []string       `json:"categoryIds"`
+	ChainID         int            `json:"-"` // Not in API response, set manually
 }
 
-type TokenInfo struct {
-	Address  string `json:"address"`
-	Symbol   string `json:"symbol"`
-	Decimals int    `json:"decimals"`
-	Name     string `json:"name"`
-}
-
-type Liquidity struct {
-	USD float64 `json:"usd"`
-}
-
-type Aggregated struct {
-	Total string `json:"total"`
+// MarketDetails contains the nested details from API response
+type MarketDetails struct {
+	Liquidity    float64 `json:"liquidity"`
+	PendleAPY    float64 `json:"pendleApy"`
+	ImpliedAPY   float64 `json:"impliedApy"`
+	AggregatedAPY float64 `json:"aggregatedApy"`
+	FeeRate      float64 `json:"feeRate"`
 }
 
 // MarketsResponse is the response from the markets endpoint
 type MarketsResponse struct {
-	Results []Market `json:"results"`
-	Total   int      `json:"total"`
-	Limit   int      `json:"limit"`
-	Skip    int      `json:"skip"`
+	Markets []Market `json:"markets"`
 }
 
 // ChainIDToName converts Pendle chain IDs to readable names
@@ -142,7 +130,12 @@ func (c *PendleClient) GetMarketsForChain(chainID int) ([]Market, error) {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	return marketsResp.Results, nil
+	// Set ChainID on each market since it's not in the API response
+	for i := range marketsResp.Markets {
+		marketsResp.Markets[i].ChainID = chainID
+	}
+
+	return marketsResp.Markets, nil
 }
 
 // GetActiveMarkets fetches only active (non-expired) markets
@@ -168,7 +161,7 @@ func (c *PendleClient) GetActiveMarkets() ([]Market, error) {
 			if err != nil {
 				// Log the first few unparseable dates to debug
 				if skippedCount < 3 {
-					fmt.Printf("DEBUG: [%d] Skipping %s - unparseable expiry: '%s'\n", i, market.Symbol, market.Expiry)
+					fmt.Printf("DEBUG: [%d] Skipping %s - unparseable expiry: '%s'\n", i, market.Name, market.Expiry)
 				}
 				skippedCount++
 				// Skip markets with unparseable expiry
@@ -181,7 +174,7 @@ func (c *PendleClient) GetActiveMarkets() ([]Market, error) {
 			activeMarkets = append(activeMarkets, market)
 		} else {
 			if expiredCount < 3 {
-				fmt.Printf("DEBUG: [%d] Skipping %s - expired on %s\n", i, market.Symbol, expiry.Format("2006-01-02"))
+				fmt.Printf("DEBUG: [%d] Skipping %s - expired on %s\n", i, market.Name, expiry.Format("2006-01-02"))
 			}
 			expiredCount++
 		}
