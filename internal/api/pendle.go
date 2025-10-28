@@ -152,16 +152,25 @@ func (c *PendleClient) GetActiveMarkets() ([]Market, error) {
 		return nil, err
 	}
 
+	fmt.Printf("DEBUG: GetActiveMarkets received %d markets total\n", len(allMarkets))
+
 	now := time.Now()
 	var activeMarkets []Market
+	skippedCount := 0
+	expiredCount := 0
 
-	for _, market := range allMarkets {
+	for i, market := range allMarkets {
 		// Parse expiry date
 		expiry, err := time.Parse("2006-01-02T15:04:05.000Z", market.Expiry)
 		if err != nil {
 			// Try alternative format
 			expiry, err = time.Parse(time.RFC3339, market.Expiry)
 			if err != nil {
+				// Log the first few unparseable dates to debug
+				if skippedCount < 3 {
+					fmt.Printf("DEBUG: [%d] Skipping %s - unparseable expiry: '%s'\n", i, market.Symbol, market.Expiry)
+				}
+				skippedCount++
 				// Skip markets with unparseable expiry
 				continue
 			}
@@ -170,8 +179,15 @@ func (c *PendleClient) GetActiveMarkets() ([]Market, error) {
 		// Only include markets that haven't expired yet
 		if expiry.After(now) {
 			activeMarkets = append(activeMarkets, market)
+		} else {
+			if expiredCount < 3 {
+				fmt.Printf("DEBUG: [%d] Skipping %s - expired on %s\n", i, market.Symbol, expiry.Format("2006-01-02"))
+			}
+			expiredCount++
 		}
 	}
+
+	fmt.Printf("DEBUG: Result - %d active, %d expired, %d unparseable\n", len(activeMarkets), expiredCount, skippedCount)
 
 	return activeMarkets, nil
 }
