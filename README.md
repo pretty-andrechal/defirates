@@ -74,9 +74,12 @@ Start the server with sample data for demonstration:
 ./defirates -load-sample
 ```
 
-The server will start on `http://localhost:8080` with pre-loaded sample data showing various Pendle yield opportunities.
+The server will start on `http://localhost:8080` with pre-loaded sample data:
+- **14 Pendle yield rates** across Ethereum, Arbitrum, Optimism, Base, and Mantle
+- **10 Beefy vault yields** across Ethereum, Arbitrum, BSC, Polygon, Avalanche, Optimism, and Base
+- Total of **24 yield rates** demonstrating all features including categories, filtering, and real-time updates
 
-**Note**: The Pendle API may be rate-limited or require authentication for direct access. Use the `-load-sample` flag to see the application functionality with realistic sample data.
+**Important**: Both Pendle and Beefy APIs may return 403 errors from certain environments due to Cloudflare/WAF blocking. This is normal and doesn't affect the application functionality. Use `-load-sample` for testing, or see [API_ACCESS_TROUBLESHOOTING.md](./API_ACCESS_TROUBLESHOOTING.md) for details and solutions.
 
 ### Command-Line Options
 
@@ -145,6 +148,8 @@ curl -s "https://api.beefy.finance/apy/breakdown"
 - **200 OK + JSON data**: API is accessible, real data fetching will work
 - **403 Forbidden**: API is blocked, use `-load-sample` mode
 - **400 Bad Request**: API is accessible but check error message for details
+
+**For detailed troubleshooting information**, including root cause analysis, deployment recommendations, and production considerations, see [API_ACCESS_TROUBLESHOOTING.md](./API_ACCESS_TROUBLESHOOTING.md).
 
 ## Project Structure
 

@@ -188,7 +188,142 @@ func LoadSampleData(db *database.DB) error {
 		}
 	}
 
-	log.Printf("Successfully loaded %d sample yield rates across multiple chains", len(sampleRates))
+	log.Printf("Successfully loaded %d Pendle sample yield rates across multiple chains", len(sampleRates))
+
+	// Create Beefy protocol
+	beefyProtocol := &models.Protocol{
+		Name:        "Beefy",
+		URL:         "https://beefy.finance",
+		Description: "Beefy is a Decentralized, Multichain Yield Optimizer",
+	}
+
+	if err := db.CreateOrUpdateProtocol(beefyProtocol); err != nil {
+		return err
+	}
+
+	// Sample Beefy vaults
+	beefySampleRates := []models.YieldRate{
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "WETH-USDC LP",
+			Chain:        "Ethereum",
+			APY:          8.45,
+			TVL:          12_345_678.90,
+			MaturityDate: nil, // Beefy vaults don't have maturity
+			PoolName:     "uniswap-v3-eth-usdc",
+			Categories:   "Beefy, WETH, USDC",
+			ExternalURL:  "https://app.beefy.finance/vault/uniswap-v3-eth-usdc",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "wstETH",
+			Chain:        "Ethereum",
+			APY:          4.23,
+			TVL:          45_678_901.23,
+			MaturityDate: nil,
+			PoolName:     "lido-wsteth",
+			Categories:   "Beefy, wstETH",
+			ExternalURL:  "https://app.beefy.finance/vault/lido-wsteth",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "USDC-USDT LP",
+			Chain:        "Arbitrum",
+			APY:          6.78,
+			TVL:          23_456_789.01,
+			MaturityDate: nil,
+			PoolName:     "curve-arb-2pool",
+			Categories:   "Beefy, USDC, USDT",
+			ExternalURL:  "https://app.beefy.finance/vault/curve-arb-2pool",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "ETH-USDC LP",
+			Chain:        "Arbitrum",
+			APY:          12.34,
+			TVL:          18_901_234.56,
+			MaturityDate: nil,
+			PoolName:     "sushi-arb-eth-usdc",
+			Categories:   "Beefy, ETH, USDC",
+			ExternalURL:  "https://app.beefy.finance/vault/sushi-arb-eth-usdc",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "BNB-BUSD LP",
+			Chain:        "BSC",
+			APY:          15.67,
+			TVL:          34_567_890.12,
+			MaturityDate: nil,
+			PoolName:     "pancake-bnb-busd",
+			Categories:   "Beefy, BNB, BUSD",
+			ExternalURL:  "https://app.beefy.finance/vault/pancake-bnb-busd",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "CAKE",
+			Chain:        "BSC",
+			APY:          22.45,
+			TVL:          9_876_543.21,
+			MaturityDate: nil,
+			PoolName:     "pancake-cake",
+			Categories:   "Beefy, CAKE",
+			ExternalURL:  "https://app.beefy.finance/vault/pancake-cake",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "MATIC-USDC LP",
+			Chain:        "Polygon",
+			APY:          9.87,
+			TVL:          15_678_901.23,
+			MaturityDate: nil,
+			PoolName:     "quickswap-matic-usdc",
+			Categories:   "Beefy, MATIC, USDC",
+			ExternalURL:  "https://app.beefy.finance/vault/quickswap-matic-usdc",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "AVAX-USDC LP",
+			Chain:        "Avalanche",
+			APY:          11.23,
+			TVL:          21_234_567.89,
+			MaturityDate: nil,
+			PoolName:     "trader-joe-avax-usdc",
+			Categories:   "Beefy, AVAX, USDC",
+			ExternalURL:  "https://app.beefy.finance/vault/trader-joe-avax-usdc",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "OP-USDC LP",
+			Chain:        "Optimism",
+			APY:          10.56,
+			TVL:          8_765_432.10,
+			MaturityDate: nil,
+			PoolName:     "velodrome-op-usdc",
+			Categories:   "Beefy, OP, USDC",
+			ExternalURL:  "https://app.beefy.finance/vault/velodrome-op-usdc",
+		},
+		{
+			ProtocolID:   beefyProtocol.ID,
+			Asset:        "ETH-USDC LP",
+			Chain:        "Base",
+			APY:          13.89,
+			TVL:          17_890_123.45,
+			MaturityDate: nil,
+			PoolName:     "aerodrome-base-eth-usdc",
+			Categories:   "Beefy, ETH, USDC",
+			ExternalURL:  "https://app.beefy.finance/vault/aerodrome-base-eth-usdc",
+		},
+	}
+
+	for _, rate := range beefySampleRates {
+		if err := db.UpsertYieldRate(&rate); err != nil {
+			log.Printf("Failed to insert Beefy sample rate: %v", err)
+			continue
+		}
+	}
+
+	log.Printf("Successfully loaded %d Beefy sample yield rates across multiple chains", len(beefySampleRates))
+	log.Printf("Total sample data loaded: %d yield rates from 2 protocols", len(sampleRates)+len(beefySampleRates))
 	return nil
 }
 

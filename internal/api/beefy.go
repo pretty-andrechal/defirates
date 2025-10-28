@@ -113,7 +113,12 @@ func (c *BeefyClient) GetVaults(chain string) ([]BeefyVault, error) {
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "DeFiRates/1.0")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Origin", "https://app.beefy.finance")
+	req.Header.Set("Referer", "https://app.beefy.finance/")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -154,7 +159,12 @@ func (c *BeefyClient) GetAPYData() (map[string]BeefyAPYBreakdown, error) {
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "DeFiRates/1.0")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Origin", "https://app.beefy.finance")
+	req.Header.Set("Referer", "https://app.beefy.finance/")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -190,7 +200,12 @@ func (c *BeefyClient) GetTVLData() (map[string]float64, error) {
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "DeFiRates/1.0")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Origin", "https://app.beefy.finance")
+	req.Header.Set("Referer", "https://app.beefy.finance/")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -219,42 +234,88 @@ func (c *BeefyClient) GetTVLData() (map[string]float64, error) {
 // GetAllVaultsWithMetrics fetches vaults from all supported chains with APY and TVL data
 func (c *BeefyClient) GetAllVaultsWithMetrics() ([]BeefyVaultWithMetrics, error) {
 	// Fetch APY and TVL data once for all vaults
+	fmt.Println("DEBUG: Fetching Beefy APY data from API...")
 	apyData, err := c.GetAPYData()
 	if err != nil {
-		fmt.Printf("Warning: failed to fetch Beefy APY data: %v\n", err)
+		fmt.Printf("WARNING: failed to fetch Beefy APY data: %v\n", err)
 		apyData = make(map[string]BeefyAPYBreakdown)
+	} else {
+		fmt.Printf("DEBUG: Successfully fetched APY data for %d vaults\n", len(apyData))
+		// Log first 3 entries as sample
+		count := 0
+		for id, breakdown := range apyData {
+			if count < 3 {
+				fmt.Printf("DEBUG: Sample APY - %s: %.4f (%.2f%%)\n", id, breakdown.TotalApy, breakdown.TotalApy*100)
+				count++
+			} else {
+				break
+			}
+		}
 	}
 
+	fmt.Println("DEBUG: Fetching Beefy TVL data from API...")
 	tvlData, err := c.GetTVLData()
 	if err != nil {
-		fmt.Printf("Warning: failed to fetch Beefy TVL data: %v\n", err)
+		fmt.Printf("WARNING: failed to fetch Beefy TVL data: %v\n", err)
 		tvlData = make(map[string]float64)
+	} else {
+		fmt.Printf("DEBUG: Successfully fetched TVL data for %d vaults\n", len(tvlData))
+		// Log first 3 entries as sample
+		count := 0
+		for id, tvl := range tvlData {
+			if count < 3 {
+				fmt.Printf("DEBUG: Sample TVL - %s: $%.2f\n", id, tvl)
+				count++
+			} else {
+				break
+			}
+		}
 	}
 
 	var allVaults []BeefyVaultWithMetrics
+	totalVaultsFound := 0
+	vaultsWithAPY := 0
+	vaultsWithTVL := 0
 
 	// Fetch vaults from each supported chain
 	for _, chain := range BeefySupportedChains {
 		vaults, err := c.GetVaults(chain)
 		if err != nil {
-			fmt.Printf("Warning: failed to fetch Beefy vaults for chain %s: %v\n", chain, err)
+			fmt.Printf("WARNING: failed to fetch Beefy vaults for chain %s: %v\n", chain, err)
 			continue
 		}
 
+		fmt.Printf("DEBUG: Chain %s returned %d vaults\n", chain, len(vaults))
+		totalVaultsFound += len(vaults)
+
+		activeCount := 0
 		for _, vault := range vaults {
 			// Only include active vaults
 			if vault.Status != "active" {
 				continue
 			}
+			activeCount++
 
 			apy := 0.0
+			apyFound := false
 			if apyBreakdown, ok := apyData[vault.ID]; ok {
 				apy = apyBreakdown.TotalApy
+				apyFound = true
+				vaultsWithAPY++
 			}
 
 			tvl := 0.0
+			tvlFound := false
 			if tvlValue, ok := tvlData[vault.ID]; ok {
 				tvl = tvlValue
+				tvlFound = true
+				vaultsWithTVL++
+			}
+
+			// Log first few vaults with detailed info
+			if len(allVaults) < 3 {
+				fmt.Printf("DEBUG: Vault %s - APY: %.4f (found: %v), TVL: %.2f (found: %v)\n",
+					vault.ID, apy, apyFound, tvl, tvlFound)
 			}
 
 			allVaults = append(allVaults, BeefyVaultWithMetrics{
@@ -264,9 +325,15 @@ func (c *BeefyClient) GetAllVaultsWithMetrics() ([]BeefyVaultWithMetrics, error)
 				Chain: GetBeefyChainName(chain),
 			})
 		}
+
+		if len(vaults) > 0 {
+			fmt.Printf("DEBUG: Chain %s: %d active vaults out of %d total\n", chain, activeCount, len(vaults))
+		}
 	}
 
-	fmt.Printf("DEBUG: Fetched %d active Beefy vaults across all chains\n", len(allVaults))
+	fmt.Printf("DEBUG: Summary - Total vaults found: %d, Active vaults: %d\n", totalVaultsFound, len(allVaults))
+	fmt.Printf("DEBUG: Vaults with APY data: %d (%.1f%%)\n", vaultsWithAPY, float64(vaultsWithAPY)/float64(len(allVaults))*100)
+	fmt.Printf("DEBUG: Vaults with TVL data: %d (%.1f%%)\n", vaultsWithTVL, float64(vaultsWithTVL)/float64(len(allVaults))*100)
 
 	return allVaults, nil
 }

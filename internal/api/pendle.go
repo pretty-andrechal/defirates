@@ -107,7 +107,12 @@ func (c *PendleClient) GetMarketsForChain(chainID int) ([]Market, error) {
 
 	// Set headers - User-Agent is important for some APIs/WAFs
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "DeFiRates/1.0 (+https://github.com/pretty-andrechal/defirates)")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Origin", "https://app.pendle.finance")
+	req.Header.Set("Referer", "https://app.pendle.finance/")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

@@ -169,8 +169,16 @@ func (f *Fetcher) FetchAndStoreBeefyData() error {
 
 	// Store each vault as a yield rate
 	successCount := 0
-	for _, vault := range vaults {
+	for i, vault := range vaults {
 		yieldRate := f.convertBeefyVaultToYieldRate(vault, protocol.ID)
+
+		// Log first few conversions for debugging
+		if i < 3 {
+			log.Printf("DEBUG: Converting vault %s - Input APY: %.2f%%, Input TVL: $%.2f",
+				vault.Vault.ID, vault.APY, vault.TVL)
+			log.Printf("DEBUG: YieldRate for %s - APY: %.2f%%, TVL: $%.2f, Categories: %s",
+				yieldRate.PoolName, yieldRate.APY, yieldRate.TVL, yieldRate.Categories)
+		}
 
 		if err := f.db.UpsertYieldRate(&yieldRate); err != nil {
 			log.Printf("Failed to store yield rate for %s: %v", vault.Vault.Name, err)
