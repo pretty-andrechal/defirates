@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeFi Rates - Yield Comparison</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DeFi Rates</h1>
+            <p class="subtitle">Compare yield rates across DeFi protocols</p>
+        </header>
+
+        <div class="filters-container">
+            <form hx-get="/" hx-target="#rates-table" hx-trigger="change, submit" hx-push-url="true">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label for="asset">Asset</label>
+                        <select name="asset" id="asset">
+                            <option value="">All Assets</option>
+                            {{range .Assets}}
+                            <option value="{{.}}" {{if eq $.Filters.Asset .}}selected{{end}}>{{.}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="chain">Chain</label>
+                        <select name="chain" id="chain">
+                            <option value="">All Chains</option>
+                            {{range .Chains}}
+                            <option value="{{.}}" {{if eq $.Filters.Chain .}}selected{{end}}>{{.}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="min_apy">Min APY (%)</label>
+                        <input type="number" name="min_apy" id="min_apy" step="0.1"
+                               placeholder="e.g., 5.0" value="{{if gt .Filters.MinAPY 0}}{{printf "%.2f" .Filters.MinAPY}}{{end}}">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="max_apy">Max APY (%)</label>
+                        <input type="number" name="max_apy" id="max_apy" step="0.1"
+                               placeholder="e.g., 50.0" value="{{if gt .Filters.MaxAPY 0}}{{printf "%.2f" .Filters.MaxAPY}}{{end}}">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="min_tvl">Min TVL ($)</label>
+                        <input type="number" name="min_tvl" id="min_tvl" step="1000"
+                               placeholder="e.g., 100000" value="{{if gt .Filters.MinTVL 0}}{{printf "%.0f" .Filters.MinTVL}}{{end}}">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="sort_by">Sort By</label>
+                        <select name="sort_by" id="sort_by">
+                            <option value="apy" {{if eq .Filters.SortBy "apy"}}selected{{end}}>APY</option>
+                            <option value="tvl" {{if eq .Filters.SortBy "tvl"}}selected{{end}}>TVL</option>
+                            <option value="updated_at" {{if eq .Filters.SortBy "updated_at"}}selected{{end}}>Last Updated</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="sort_order">Order</label>
+                        <select name="sort_order" id="sort_order">
+                            <option value="desc" {{if eq .Filters.SortOrder "desc"}}selected{{end}}>Descending</option>
+                            <option value="asc" {{if eq .Filters.SortOrder "asc"}}selected{{end}}>Ascending</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group filter-buttons">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <a href="/" class="btn btn-secondary">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div id="rates-table">
+            {{template "table.html" .}}
+        </div>
+
+        <footer>
+            <p>Data refreshed periodically from DeFi protocols. Currently showing: Pendle</p>
+            <p>Built with Go and HTMX</p>
+        </footer>
+    </div>
+</body>
+</html>
