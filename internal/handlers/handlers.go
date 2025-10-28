@@ -33,6 +33,17 @@ func New(db *database.DB) (*Handler, error) {
 			}
 			return a / b
 		},
+		"split": func(s, sep string) []string {
+			if s == "" {
+				return []string{}
+			}
+			parts := strings.Split(s, sep)
+			// Trim whitespace from each part
+			for i := range parts {
+				parts[i] = strings.TrimSpace(parts[i])
+			}
+			return parts
+		},
 	}
 
 	// Parse templates with functions

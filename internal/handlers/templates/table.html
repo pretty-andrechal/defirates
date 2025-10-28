@@ -37,9 +37,11 @@
                 </td>
                 <td>
                     {{if .Categories}}
-                    <span class="categories-text">{{.Categories}}</span>
+                        {{range split .Categories ","}}
+                        <span class="chain-badge">{{.}}</span>
+                        {{end}}
                     {{else}}
-                    <span class="categories-text" style="color: #999;">N/A</span>
+                    <span style="color: #999;">N/A</span>
                     {{end}}
                 </td>
                 <td>
