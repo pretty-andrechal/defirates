@@ -253,9 +253,18 @@ func (c *BeefyClient) GetTVLData() (map[string]float64, error) {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var tvlData map[string]float64
-	if err := json.Unmarshal(body, &tvlData); err != nil {
+	// TVL data is nested by chain ID: {"1": {"vault-id": tvl}, "56": {...}}
+	var tvlByChain map[string]map[string]float64
+	if err := json.Unmarshal(body, &tvlByChain); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	// Flatten to simple vault-id -> TVL map
+	tvlData := make(map[string]float64)
+	for _, vaults := range tvlByChain {
+		for vaultID, tvl := range vaults {
+			tvlData[vaultID] = tvl
+		}
 	}
 
 	return tvlData, nil
