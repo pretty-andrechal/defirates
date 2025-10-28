@@ -145,6 +145,26 @@ func LoadSampleData(db *database.DB) error {
 			PoolName:     "PT-weETH-26DEC2025",
 			ExternalURL:  "https://app.pendle.finance/trade/pools/0x8e5ca4d5f8f3e5e5b2c2e5f5d5c5b5a5e5d5c5b5/",
 		},
+		{
+			ProtocolID:   protocol.ID,
+			Asset:        "mETH",
+			Chain:        "Mantle",
+			APY:          14.89,
+			TVL:          4_321_098.76,
+			MaturityDate: timePtr(time.Date(2025, 12, 26, 0, 0, 0, 0, time.UTC)),
+			PoolName:     "PT-mETH-26DEC2025",
+			ExternalURL:  "https://app.pendle.finance/trade/pools/0xa1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/",
+		},
+		{
+			ProtocolID:   protocol.ID,
+			Asset:        "sUSDe",
+			Chain:        "Mantle",
+			APY:          22.34,
+			TVL:          12_345_678.90,
+			MaturityDate: timePtr(time.Date(2026, 1, 29, 0, 0, 0, 0, time.UTC)),
+			PoolName:     "PT-sUSDe-29JAN2026-MANTLE",
+			ExternalURL:  "https://app.pendle.finance/trade/pools/0xb2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3/",
+		},
 	}
 
 	for _, rate := range sampleRates {
@@ -154,7 +174,7 @@ func LoadSampleData(db *database.DB) error {
 		}
 	}
 
-	log.Printf("Loaded %d sample yield rates", len(sampleRates))
+	log.Printf("Successfully loaded %d sample yield rates across multiple chains", len(sampleRates))
 	return nil
 }
 
