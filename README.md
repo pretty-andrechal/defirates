@@ -14,9 +14,11 @@ A DeFi yield rate comparison site built with Go and HTMX. Compare yield rates ac
 ## Current Protocol Support
 
 ### Pendle
-- Fetches all active markets across multiple chains (Ethereum, Arbitrum, Optimism, Base, etc.)
+- Fetches all active markets across 10 supported chains
+- **Supported chains**: Ethereum, Arbitrum, Optimism, Base, BSC, Mantle, Zora, Sonic, Taiko, Berachain
 - Displays implied APY, TVL, maturity dates, and pool information
 - Direct links to pool pages on Pendle app
+- Automatic expiry filtering (excludes expired markets)
 
 ### Coming Soon
 The midterm goal is to integrate all protocols listed on [OpenYield](https://www.openyield.com).
@@ -100,7 +102,7 @@ If you see warnings like "failed to fetch markets" or "Access denied", this is n
 - WAF (Web Application Firewall) rules
 
 **Solution:**
-Use the sample data mode which provides 14 realistic Pendle yield opportunities across 5 chains (Ethereum, Arbitrum, Optimism, Base, Mantle) without requiring external API access:
+Use the sample data mode which provides realistic Pendle yield opportunities across multiple chains without requiring external API access:
 
 ```bash
 ./defirates -load-sample
@@ -130,26 +132,33 @@ curl -s "https://api-v2.pendle.finance/api/core/v1/1/markets/active"
 ```
 defirates/
 ├── cmd/
-│   └── server/          # Application entry point
+│   └── server/                  # Application entry point
 │       └── main.go
 ├── internal/
-│   ├── api/             # External API clients
-│   │   ├── pendle.go   # Pendle API client
-│   │   └── fetcher.go  # Data fetching service
-│   ├── database/        # Database layer
-│   │   └── database.go # SQLite operations
-│   ├── handlers/        # HTTP handlers
+│   ├── api/                     # External API clients
+│   │   ├── pendle.go           # Pendle API client
+│   │   ├── fetcher.go          # Data fetching service
+│   │   ├── pendle_test.go      # API client unit tests
+│   │   └── integration_test.go # End-to-end integration tests
+│   ├── database/                # Database layer
+│   │   ├── database.go         # SQLite operations
+│   │   └── database_test.go    # Database unit tests
+│   ├── handlers/                # HTTP handlers
 │   │   ├── handlers.go
-│   │   └── templates/  # HTML templates
+│   │   ├── handlers_test.go    # Handler/template tests
+│   │   └── templates/          # HTML templates
 │   │       ├── index.html
 │   │       └── table.html
-│   └── models/          # Data models
-│       └── yield.go
+│   └── models/                  # Data models
+│       ├── yield.go
+│       └── models_test.go      # Model tests
 ├── static/
-│   └── css/            # Stylesheets
+│   └── css/                    # Stylesheets
 │       └── style.css
 ├── go.mod
 ├── go.sum
+├── run_tests.sh                # Test suite runner
+├── TESTING_GUIDE.md            # Comprehensive testing documentation
 └── README.md
 ```
 
@@ -178,6 +187,60 @@ Main page with yield rates table and filters.
 3. **Periodic Updates**: A background goroutine refreshes data at the configured interval
 4. **Real-time Filtering**: HTMX enables instant filtering without page reloads
 5. **Responsive UI**: Clean, modern interface adapts to all screen sizes
+
+## Testing
+
+The project includes a comprehensive test suite covering all layers of the application.
+
+### Running Tests
+
+**Quick test run:**
+```bash
+go test ./...
+```
+
+**Comprehensive test suite with coverage and race detection:**
+```bash
+./run_tests.sh
+```
+
+This script runs:
+- Unit tests for all packages (API, Database, Handlers, Models)
+- Integration tests (end-to-end API flows)
+- Race condition detection
+- Test coverage reporting (currently **59.2%** overall)
+
+**Run specific test suites:**
+```bash
+# API unit tests only (skips integration tests)
+go test -v ./internal/api -short
+
+# Integration tests only
+go test -v ./internal/api -run Integration
+
+# Database tests
+go test -v ./internal/database
+
+# Handler/template tests
+go test -v ./internal/handlers
+
+# Model tests
+go test -v ./internal/models
+```
+
+**Note for macOS users:** The test script automatically suppresses harmless linker warnings about `LC_DYSYMTAB` that appear when running tests with the race detector. These warnings don't affect test functionality.
+
+### Test Coverage
+
+- **API Package**: 49.1% coverage (unit tests + integration tests)
+- **Database Package**: 86.4% coverage (CRUD operations, filtering, sorting)
+- **Handlers Package**: 60.4% coverage (HTTP handlers, template rendering)
+- **Models Package**: 100% coverage (struct marshaling, JSON tags)
+- **Overall**: 59.2% coverage
+
+### Testing Documentation
+
+For detailed information about the test suite, test scenarios, debugging, and CI/CD integration, see [TESTING_GUIDE.md](TESTING_GUIDE.md).
 
 ## Adding More Protocols
 
@@ -228,6 +291,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Roadmap
 
 - [x] Pendle integration
+- [x] Comprehensive test suite (59.2% coverage)
+- [x] Multi-chain support (10 chains)
+- [x] Real-time filtering with HTMX
 - [ ] Add more protocols (Aave, Compound, etc.)
 - [ ] Historical data tracking and charts
 - [ ] Email/webhook notifications for high yields
