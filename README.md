@@ -84,8 +84,46 @@ Available options:
 For development with auto-reload, you can use `go run`:
 
 ```bash
-go run ./cmd/server -fetch-interval 1m
+go run ./cmd/server -load-sample -fetch-interval 1m
 ```
+
+## Troubleshooting
+
+### Pendle API Access Issues
+
+If you see warnings like "failed to fetch markets" or "Access denied", this is normal in certain network environments:
+
+**Common causes:**
+- Network firewalls blocking cryptocurrency/DeFi APIs
+- Corporate proxy restrictions
+- API rate limiting
+- WAF (Web Application Firewall) rules
+
+**Solution:**
+Use the sample data mode which provides 14 realistic Pendle yield opportunities across 5 chains (Ethereum, Arbitrum, Optimism, Base, Mantle) without requiring external API access:
+
+```bash
+./defirates -load-sample
+```
+
+This demonstrates all features including:
+- Multi-chain filtering
+- APY and TVL range filtering
+- Asset-specific searches
+- Real-time HTMX updates
+- Responsive UI
+
+### Testing API Access
+
+To test if the Pendle API is accessible from your environment:
+
+```bash
+curl -s "https://api-v2.pendle.finance/api/core/v1/1/markets/active"
+```
+
+- **200 OK + JSON data**: API is accessible, real data fetching will work
+- **403 Forbidden**: API is blocked, use `-load-sample` mode
+- **400 Bad Request**: API is accessible but check error message for details
 
 ## Project Structure
 
