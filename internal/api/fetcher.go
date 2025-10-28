@@ -15,6 +15,7 @@ type Fetcher struct {
 	pendle          *PendleClient
 	beefy           *BeefyClient
 	onDataUpdate    func() // Callback function triggered when data is updated
+	debugLogging    bool
 }
 
 // NewFetcher creates a new data fetcher
@@ -24,7 +25,15 @@ func NewFetcher(db *database.DB) *Fetcher {
 		pendle:       NewPendleClient(),
 		beefy:        NewBeefyClient(),
 		onDataUpdate: nil,
+		debugLogging: false,
 	}
+}
+
+// EnableDebugLogging enables HTTP debug logging for API calls
+func (f *Fetcher) EnableDebugLogging() {
+	f.debugLogging = true
+	f.pendle = NewPendleClientWithDebug(f.db)
+	f.beefy = NewBeefyClientWithDebug(f.db)
 }
 
 // SetOnDataUpdateCallback sets a callback function to be called when data is updated

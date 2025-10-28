@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Debug Logs - DeFi Rates</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .debug-container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .debug-log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .debug-log.error {
+            background: #ffe6e6;
+            border-color: #dc3545;
+        }
+        .debug-log.success {
+            background: #e6ffe6;
+            border-color: #28a745;
+        }
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .debug-method {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .debug-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .debug-status.status-200 { background: #28a745; color: white; }
+        .debug-status.status-403 { background: #dc3545; color: white; }
+        .debug-status.status-404 { background: #ffc107; color: black; }
+        .debug-url {
+            color: #6c757d;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .debug-details {
+            margin-top: 10px;
+        }
+        .debug-section {
+            margin-top: 10px;
+        }
+        .debug-section-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        .debug-content {
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .debug-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+        .filter-bar {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .filter-bar select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ced4da;
+        }
+        .stats {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>HTTP Debug Logs</h1>
+            <nav>
+                <a href="/" class="nav-link">← Back to DeFi Rates</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="debug-container">
+        <div class="stats">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{{.TotalLogs}}</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{.BeefyLogs}}</div>
+                    <div class="stat-label">Beefy Requests</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{.PendleLogs}}</div>
+                    <div class="stat-label">Pendle Requests</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <label>Filter by source:
+                <select onchange="window.location.href='?source=' + this.value">
+                    <option value="">All</option>
+                    <option value="beefy" {{if eq .SourceFilter "beefy"}}selected{{end}}>Beefy</option>
+                    <option value="pendle" {{if eq .SourceFilter "pendle"}}selected{{end}}>Pendle</option>
+                </select>
+            </label>
+        </div>
+
+        {{if .Logs}}
+            {{range .Logs}}
+            <div class="debug-log {{if .Error}}error{{else if eq .ResponseStatus 200}}success{{end}}">
+                <div class="debug-header">
+                    <div>
+                        <span class="debug-method">{{.Method}}</span>
+                        <span class="debug-url">{{.URL}}</span>
+                    </div>
+                    {{if .ResponseStatus}}
+                        <span class="debug-status status-{{.ResponseStatus}}">{{.ResponseStatus}}</span>
+                    {{end}}
+                </div>
+
+                <div class="debug-meta">
+                    <span><strong>Source:</strong> {{.Source}}</span>
+                    <span><strong>Time:</strong> {{.Timestamp.Format "2006-01-02 15:04:05"}}</span>
+                    <span><strong>Duration:</strong> {{.DurationMS}}ms</span>
+                </div>
+
+                {{if .Error}}
+                <div class="debug-section">
+                    <div class="debug-section-title">Error</div>
+                    <div class="debug-content">{{.Error}}</div>
+                </div>
+                {{end}}
+
+                {{if .RequestHeaders}}
+                <div class="debug-section">
+                    <div class="debug-section-title">Request Headers</div>
+                    <div class="debug-content">{{.RequestHeaders}}</div>
+                </div>
+                {{end}}
+
+                {{if .RequestBody}}
+                <div class="debug-section">
+                    <div class="debug-section-title">Request Body</div>
+                    <div class="debug-content">{{.RequestBody}}</div>
+                </div>
+                {{end}}
+
+                {{if .ResponseHeaders}}
+                <div class="debug-section">
+                    <div class="debug-section-title">Response Headers</div>
+                    <div class="debug-content">{{.ResponseHeaders}}</div>
+                </div>
+                {{end}}
+
+                {{if .ResponseBody}}
+                <div class="debug-section">
+                    <div class="debug-section-title">Response Body {{if gt (len .ResponseBody) 1000}}(first 1000 chars){{end}}</div>
+                    <div class="debug-content">{{if gt (len .ResponseBody) 1000}}{{slice .ResponseBody 0 1000}}...{{else}}{{.ResponseBody}}{{end}}</div>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        {{else}}
+            <p>No debug logs available. Debug logging may be disabled or no API calls have been made yet.</p>
+            <p>To enable debug logging, start the server with the <code>-debug-http</code> flag.</p>
+        {{end}}
+    </main>
+</body>
+</html>

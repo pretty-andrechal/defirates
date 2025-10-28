@@ -255,3 +255,48 @@ func (h *Handler) HandleAPIRates(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetEventManager() *EventManager {
 	return h.eventManager
 }
+
+// HandleDebugLogs displays HTTP debug logs
+func (h *Handler) HandleDebugLogs(w http.ResponseWriter, r *http.Request) {
+	sourceFilter := r.URL.Query().Get("source")
+	
+	// Get logs from database
+	logs, err := h.db.GetHTTPDebugLogs(100, sourceFilter) // Limit to latest 100
+	if err != nil {
+		log.Printf("Error fetching debug logs: %v", err)
+		http.Error(w, "Failed to fetch debug logs", http.StatusInternalServerError)
+		return
+	}
+
+	// Count logs by source
+	beefyCount := 0
+	pendleCount := 0
+	for _, logEntry := range logs {
+		switch logEntry.Source {
+		case "beefy":
+			beefyCount++
+		case "pendle":
+			pendleCount++
+		}
+	}
+
+	data := struct {
+		Logs         []models.HTTPDebugLog
+		SourceFilter string
+		TotalLogs    int
+		BeefyLogs    int
+		PendleLogs   int
+	}{
+		Logs:         logs,
+		SourceFilter: sourceFilter,
+		TotalLogs:    len(logs),
+		BeefyLogs:    beefyCount,
+		PendleLogs:   pendleCount,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := h.templates.ExecuteTemplate(w, "debug.html", data); err != nil {
+		log.Printf("Error executing debug template: %v", err)
+		http.Error(w, "Failed to render debug logs", http.StatusInternalServerError)
+	}
+}

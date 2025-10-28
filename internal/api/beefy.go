@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pretty-andrechal/defirates/internal/database"
 )
 
 const (
@@ -27,6 +29,34 @@ func NewBeefyClient() *BeefyClient {
 		},
 		baseURL: BeefyBaseURL,
 	}
+}
+
+// NewBeefyClientWithDebug creates a new Beefy API client with debug logging
+func NewBeefyClientWithDebug(db *database.DB) *BeefyClient {
+	baseClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Wrap with debug client
+	debugClient := NewDebugHTTPClient(baseClient, db, "beefy", true)
+	httpClient := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &debugHTTPTransport{debugClient: debugClient},
+	}
+
+	return &BeefyClient{
+		httpClient: httpClient,
+		baseURL:    BeefyBaseURL,
+	}
+}
+
+// debugHTTPTransport wraps DebugHTTPClient to implement http.RoundTripper
+type debugHTTPTransport struct {
+	debugClient *DebugHTTPClient
+}
+
+func (t *debugHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.debugClient.Do(req)
 }
 
 // BeefyVault represents a Beefy vault from the API

@@ -17,6 +17,7 @@ func main() {
 	dbPath := flag.String("db", "defirates.db", "Path to SQLite database")
 	fetchInterval := flag.Duration("fetch-interval", 5*time.Minute, "Interval for fetching yield data")
 	loadSample := flag.Bool("load-sample", false, "Load sample data for demonstration")
+	debugHTTP := flag.Bool("debug-http", false, "Enable HTTP request/response debug logging")
 	flag.Parse()
 
 	log.Println("Starting DeFi Rates server...")
@@ -47,6 +48,13 @@ func main() {
 	fetcher.SetOnDataUpdateCallback(func() {
 		handler.GetEventManager().BroadcastDataUpdate()
 	})
+
+	// Enable debug logging if requested
+	if *debugHTTP {
+		fetcher.EnableDebugLogging()
+		log.Println("HTTP debug logging enabled - logs available at /debug")
+	}
+
 	fetcher.StartPeriodicFetch(*fetchInterval)
 	log.Printf("Data fetcher started (interval: %v)", *fetchInterval)
 
@@ -55,6 +63,7 @@ func main() {
 	mux.HandleFunc("/", handler.HandleIndex)
 	mux.HandleFunc("/events", handler.HandleEvents)
 	mux.HandleFunc("/api/rates", handler.HandleAPIRates)
+	mux.HandleFunc("/debug", handler.HandleDebugLogs)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Start server

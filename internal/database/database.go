@@ -65,6 +65,26 @@ func (db *DB) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_yield_rates_asset ON yield_rates(asset);
 	CREATE INDEX IF NOT EXISTS idx_yield_rates_chain ON yield_rates(chain);
 	CREATE INDEX IF NOT EXISTS idx_yield_rates_categories ON yield_rates(categories);
+
+	CREATE TABLE IF NOT EXISTS http_debug_logs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+		method TEXT NOT NULL,
+		url TEXT NOT NULL,
+		request_headers TEXT,
+		request_body TEXT,
+		response_status INTEGER,
+		response_headers TEXT,
+		response_body TEXT,
+		error TEXT,
+		duration_ms INTEGER,
+		source TEXT
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_http_debug_logs_timestamp ON http_debug_logs(timestamp DESC);
+	CREATE INDEX IF NOT EXISTS idx_http_debug_logs_url ON http_debug_logs(url);
+	CREATE INDEX IF NOT EXISTS idx_http_debug_logs_source ON http_debug_logs(source);
+	CREATE INDEX IF NOT EXISTS idx_http_debug_logs_status ON http_debug_logs(response_status);
 	`
 
 	_, err := db.conn.Exec(schema)
@@ -441,4 +461,130 @@ func (db *DB) GetYieldRatesByIDs(ids []int64) ([]models.YieldRate, error) {
 	}
 
 	return rates, rows.Err()
+}
+
+// StoreHTTPDebugLog stores an HTTP debug log entry
+func (db *DB) StoreHTTPDebugLog(log *models.HTTPDebugLog) error {
+	query := `
+		INSERT INTO http_debug_logs (
+			timestamp, method, url, request_headers, request_body,
+			response_status, response_headers, response_body,
+			error, duration_ms, source
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id
+	`
+	return db.conn.QueryRow(
+		query,
+		log.Timestamp,
+		log.Method,
+		log.URL,
+		log.RequestHeaders,
+		log.RequestBody,
+		log.ResponseStatus,
+		log.ResponseHeaders,
+		log.ResponseBody,
+		log.Error,
+		log.DurationMS,
+		log.Source,
+	).Scan(&log.ID)
+}
+
+// GetHTTPDebugLogs retrieves HTTP debug logs with optional filtering
+func (db *DB) GetHTTPDebugLogs(limit int, source string) ([]models.HTTPDebugLog, error) {
+	query := `
+		SELECT id, timestamp, method, url, request_headers, request_body,
+		       response_status, response_headers, response_body,
+		       error, duration_ms, source
+		FROM http_debug_logs
+		WHERE 1=1
+	`
+	args := []interface{}{}
+
+	if source != "" {
+		query += " AND source = ?"
+		args = append(args, source)
+	}
+
+	query += " ORDER BY timestamp DESC"
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.HTTPDebugLog
+	for rows.Next() {
+		var log models.HTTPDebugLog
+		var requestHeaders, requestBody, responseHeaders, responseBody, errorMsg sql.NullString
+		var responseStatus, durationMS sql.NullInt64
+
+		err := rows.Scan(
+			&log.ID,
+			&log.Timestamp,
+			&log.Method,
+			&log.URL,
+			&requestHeaders,
+			&requestBody,
+			&responseStatus,
+			&responseHeaders,
+			&responseBody,
+			&errorMsg,
+			&durationMS,
+			&log.Source,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if requestHeaders.Valid {
+			log.RequestHeaders = requestHeaders.String
+		}
+		if requestBody.Valid {
+			log.RequestBody = requestBody.String
+		}
+		if responseStatus.Valid {
+			log.ResponseStatus = int(responseStatus.Int64)
+		}
+		if responseHeaders.Valid {
+			log.ResponseHeaders = responseHeaders.String
+		}
+		if responseBody.Valid {
+			log.ResponseBody = responseBody.String
+		}
+		if errorMsg.Valid {
+			log.Error = errorMsg.String
+		}
+		if durationMS.Valid {
+			log.DurationMS = durationMS.Int64
+		}
+
+		logs = append(logs, log)
+	}
+
+	return logs, rows.Err()
+}
+
+// CleanOldHTTPDebugLogs removes logs older than the specified duration
+func (db *DB) CleanOldHTTPDebugLogs(olderThan time.Duration) (int64, error) {
+	cutoffTime := time.Now().Add(-olderThan)
+	query := `DELETE FROM http_debug_logs WHERE timestamp < ?`
+	result, err := db.conn.Exec(query, cutoffTime)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// CountHTTPDebugLogs returns the total number of debug logs
+func (db *DB) CountHTTPDebugLogs() (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM http_debug_logs`
+	err := db.conn.QueryRow(query).Scan(&count)
+	return count, err
 }

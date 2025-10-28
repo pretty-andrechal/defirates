@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/pretty-andrechal/defirates/internal/database"
 )
 
 const (
@@ -25,6 +27,25 @@ func NewPendleClient() *PendleClient {
 			Timeout: 30 * time.Second,
 		},
 		baseURL: PendleBaseURL,
+	}
+}
+
+// NewPendleClientWithDebug creates a new Pendle API client with debug logging
+func NewPendleClientWithDebug(db *database.DB) *PendleClient {
+	baseClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Wrap with debug client
+	debugClient := NewDebugHTTPClient(baseClient, db, "pendle", true)
+	httpClient := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &debugHTTPTransport{debugClient: debugClient},
+	}
+
+	return &PendleClient{
+		httpClient: httpClient,
+		baseURL:    PendleBaseURL,
 	}
 }
 
