@@ -80,15 +80,47 @@ type BeefyVault struct {
 	Chain               string   `json:"chain"` // May be in some responses or derived from endpoint
 }
 
+// FlexFloat handles JSON numbers that may come as strings or floats
+type FlexFloat float64
+
+// UnmarshalJSON implements json.Unmarshaler
+func (f *FlexFloat) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as float first
+	var floatVal float64
+	if err := json.Unmarshal(data, &floatVal); err == nil {
+		*f = FlexFloat(floatVal)
+		return nil
+	}
+
+	// Try to unmarshal as string, then parse to float
+	var stringVal string
+	if err := json.Unmarshal(data, &stringVal); err == nil {
+		if stringVal == "" || stringVal == "null" {
+			*f = 0
+			return nil
+		}
+		// Parse string to float
+		floatVal, err := json.Number(stringVal).Float64()
+		if err == nil {
+			*f = FlexFloat(floatVal)
+			return nil
+		}
+	}
+
+	// If both fail, default to 0
+	*f = 0
+	return nil
+}
+
 // BeefyAPYData represents APY data from the breakdown endpoint
 type BeefyAPYBreakdown struct {
-	TotalApy            float64 `json:"totalApy"`
-	VaultApr            float64 `json:"vaultApr"`
-	CompoundingsPerYear int     `json:"compoundingsPerYear"`
-	BeefyPerformanceFee float64 `json:"beefyPerformanceFee"`
-	VaultApy            float64 `json:"vaultApy"`
-	LpFee               float64 `json:"lpFee"`
-	TradingApr          float64 `json:"tradingApr"`
+	TotalApy            FlexFloat `json:"totalApy"`
+	VaultApr            FlexFloat `json:"vaultApr"`
+	CompoundingsPerYear int       `json:"compoundingsPerYear"`
+	BeefyPerformanceFee FlexFloat `json:"beefyPerformanceFee"`
+	VaultApy            FlexFloat `json:"vaultApy"`
+	LpFee               FlexFloat `json:"lpFee"`
+	TradingApr          FlexFloat `json:"tradingApr"`
 }
 
 // BeefyVaultWithMetrics combines vault info with APY and TVL
@@ -284,7 +316,8 @@ func (c *BeefyClient) GetAllVaultsWithMetrics() ([]BeefyVaultWithMetrics, error)
 		count := 0
 		for id, breakdown := range apyData {
 			if count < 3 {
-				fmt.Printf("DEBUG: Sample APY - %s: %.4f (%.2f%%)\n", id, breakdown.TotalApy, breakdown.TotalApy*100)
+				apy := float64(breakdown.TotalApy)
+				fmt.Printf("DEBUG: Sample APY - %s: %.4f (%.2f%%)\n", id, apy, apy*100)
 				count++
 			} else {
 				break
@@ -338,7 +371,7 @@ func (c *BeefyClient) GetAllVaultsWithMetrics() ([]BeefyVaultWithMetrics, error)
 			apy := 0.0
 			apyFound := false
 			if apyBreakdown, ok := apyData[vault.ID]; ok {
-				apy = apyBreakdown.TotalApy
+				apy = float64(apyBreakdown.TotalApy)
 				apyFound = true
 				vaultsWithAPY++
 			}
