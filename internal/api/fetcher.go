@@ -52,6 +52,18 @@ func (f *Fetcher) FetchAndStorePendleData() error {
 		log.Println("The Pendle API may be rate-limited or unavailable.")
 		log.Println("You can still use the application - it will show any existing data.")
 		log.Println("To see sample data, run with the -load-sample flag.")
+
+		// Check if we have any existing data in the database
+		// If yes, trigger update callback so browser can refresh displayed values
+		existingRates, checkErr := f.db.GetYieldRates(models.FilterParams{})
+		if checkErr == nil && len(existingRates) > 0 {
+			log.Printf("Database contains %d existing rates, broadcasting refresh event", len(existingRates))
+			if f.onDataUpdate != nil {
+				log.Println("Broadcasting data update event...")
+				f.onDataUpdate()
+			}
+		}
+
 		return nil
 	}
 
