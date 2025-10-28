@@ -108,7 +108,7 @@ func (c *PendleClient) GetMarketsForChain(chainID int) ([]Market, error) {
 	// Set headers - User-Agent is important for some APIs/WAFs
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	// Note: Don't set Accept-Encoding - Go's http client handles gzip automatically
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Origin", "https://app.pendle.finance")
