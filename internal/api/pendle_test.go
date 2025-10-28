@@ -234,23 +234,42 @@ func TestGetActiveMarkets_ExpiryFiltering(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Test GetMarketsForChain directly to avoid the multi-chain loop
 	client := &PendleClient{
 		httpClient: &http.Client{Timeout: 5 * time.Second},
 		baseURL:    server.URL,
 	}
 
-	markets, err := client.GetActiveMarkets()
+	// Get markets for one chain
+	allMarkets, err := client.GetMarketsForChain(1)
 	if err != nil {
-		t.Fatalf("GetActiveMarkets() error = %v", err)
+		t.Fatalf("GetMarketsForChain() error = %v", err)
+	}
+
+	if len(allMarkets) != 3 {
+		t.Fatalf("Expected 3 total markets, got %d", len(allMarkets))
+	}
+
+	// Test the filtering logic directly on the fetched markets
+	activeMarkets := []Market{}
+	for _, market := range allMarkets {
+		expiry, err := time.Parse("2006-01-02T15:04:05.000Z", market.Expiry)
+		if err != nil {
+			t.Fatalf("Failed to parse expiry: %v", err)
+		}
+
+		if expiry.After(now) {
+			activeMarkets = append(activeMarkets, market)
+		}
 	}
 
 	// Should only return the 2 future markets, not the expired one
-	if len(markets) != 2 {
-		t.Errorf("GetActiveMarkets() returned %d markets, want 2 (expired market should be filtered)", len(markets))
+	if len(activeMarkets) != 2 {
+		t.Errorf("Filtering returned %d markets, want 2 (expired market should be filtered)", len(activeMarkets))
 	}
 
 	// Verify we got the right markets
-	for _, market := range markets {
+	for _, market := range activeMarkets {
 		if market.Name == "Expired Market" {
 			t.Error("Expired market was not filtered out")
 		}

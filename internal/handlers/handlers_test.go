@@ -123,28 +123,32 @@ func TestHandleIndex_Filtering(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		queryParams  string
-		shouldContain string
-		shouldNotContain string
+		name             string
+		queryParams      string
+		wantCount        int // Expected number of results
+		shouldContainAPY string
+		shouldNotContainAPY string
 	}{
 		{
-			name:         "filter by asset",
-			queryParams:  "?asset=ETH",
-			shouldContain: "ETH",
-			shouldNotContain: "USDC",
+			name:             "filter by asset",
+			queryParams:      "?asset=ETH",
+			wantCount:        1,
+			shouldContainAPY: "10.00%", // ETH pool
+			shouldNotContainAPY: "5.00%",  // USDC pool should be filtered out
 		},
 		{
-			name:         "filter by chain",
-			queryParams:  "?chain=Arbitrum",
-			shouldContain: "Arbitrum",
-			shouldNotContain: "Ethereum",
+			name:             "filter by chain",
+			queryParams:      "?chain=Arbitrum",
+			wantCount:        1,
+			shouldContainAPY: "5.00%", // Arbitrum pool
+			shouldNotContainAPY: "10.00%", // Ethereum pool should be filtered out
 		},
 		{
-			name:         "filter by min APY",
-			queryParams:  "?min_apy=8",
-			shouldContain: "10.00%",
-			shouldNotContain: "5.00%",
+			name:             "filter by min APY",
+			queryParams:      "?min_apy=8",
+			wantCount:        1,
+			shouldContainAPY: "10.00%",
+			shouldNotContainAPY: "5.00%",
 		},
 	}
 
@@ -161,12 +165,20 @@ func TestHandleIndex_Filtering(t *testing.T) {
 
 			body := w.Body.String()
 
-			if tt.shouldContain != "" && !contains(body, tt.shouldContain) {
-				t.Errorf("Response should contain %s", tt.shouldContain)
+			// Check result count in the response
+			expectedCountText := "Showing " + string(rune(tt.wantCount+'0')) + " yield"
+			if !contains(body, expectedCountText) {
+				t.Errorf("Response should show %d result(s), body doesn't contain '%s'", tt.wantCount, expectedCountText)
 			}
 
-			if tt.shouldNotContain != "" && contains(body, tt.shouldNotContain) {
-				t.Errorf("Response should not contain %s", tt.shouldNotContain)
+			// Check that the expected APY is present (from included pool)
+			if tt.shouldContainAPY != "" && !contains(body, tt.shouldContainAPY) {
+				t.Errorf("Response should contain APY %s", tt.shouldContainAPY)
+			}
+
+			// Check that the filtered-out APY is NOT present
+			if tt.shouldNotContainAPY != "" && contains(body, tt.shouldNotContainAPY) {
+				t.Errorf("Response should not contain APY %s (should be filtered out)", tt.shouldNotContainAPY)
 			}
 		})
 	}
